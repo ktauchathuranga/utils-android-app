@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Bluetooth HID</string>
+    <string name="app_name">Utils</string>
     <string name="bluetooth_not_supported">Bluetooth not supported on this device</string>
     <string name="bluetooth_required">Bluetooth is required to use this app</string>
     <string name="bluetooth_permission_required">Bluetooth permission required</string>
