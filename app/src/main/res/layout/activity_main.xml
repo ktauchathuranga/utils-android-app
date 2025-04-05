@@ -5,7 +5,6 @@
     android:orientation="vertical"
     android:gravity="center">
 
-    <!-- Connection status -->
     <TextView
         android:id="@+id/status_text"
         android:layout_width="wrap_content"
@@ -13,7 +12,6 @@
         android:text="Not connected"
         android:textSize="18sp" />
 
-    <!-- Button to connect/disconnect -->
     <Button
         android:id="@+id/connect_button"
         android:layout_width="wrap_content"
@@ -21,7 +19,6 @@
         android:text="Connect"
         android:layout_marginTop="20dp" />
 
-    <!-- Button to send Win+L -->
     <Button
         android:id="@+id/send_button"
         android:layout_width="wrap_content"
