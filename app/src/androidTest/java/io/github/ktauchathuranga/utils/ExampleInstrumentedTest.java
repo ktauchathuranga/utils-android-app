@@ -1,4 +1,4 @@
-package io.github.ktauchathuranga.bluetoothhid;
+package io.github.ktauchathuranga.utils;
 
 import android.content.Context;
 
@@ -21,6 +21,6 @@ public class ExampleInstrumentedTest {
     public void useAppContext() {
         // Context of the app under test.
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        assertEquals("io.github.ktauchathuranga.bluetoothhid", appContext.getPackageName());
+        assertEquals("io.github.ktauchathuranga.utils", appContext.getPackageName());
     }
 }

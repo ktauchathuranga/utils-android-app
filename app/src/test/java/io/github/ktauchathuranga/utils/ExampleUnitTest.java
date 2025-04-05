@@ -1,4 +1,4 @@
-package io.github.ktauchathuranga.bluetoothhid;
+package io.github.ktauchathuranga.utils;
 
 import org.junit.Test;
 

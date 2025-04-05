@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "BluetoothHID"
+rootProject.name = "Utils"
 include(":app")
  

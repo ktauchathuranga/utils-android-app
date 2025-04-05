@@ -4,7 +4,7 @@
     "type": "APK",
     "kind": "Directory"
   },
-  "applicationId": "io.github.ktauchathuranga.bluetoothhid",
+  "applicationId": "io.github.ktauchathuranga.utils",
   "variantName": "release",
   "elements": [
     {

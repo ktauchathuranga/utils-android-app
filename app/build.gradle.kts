@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace = "io.github.ktauchathuranga.bluetoothhid"
+    namespace = "io.github.ktauchathuranga.utils"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "io.github.ktauchathuranga.bluetoothhid"
+        applicationId = "io.github.ktauchathuranga.utils"
         minSdk = 28
         targetSdk = 35
         versionCode = 1

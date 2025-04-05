@@ -1,4 +1,4 @@
-package io.github.ktauchathuranga.bluetoothhid;
+package io.github.ktauchathuranga.utils;
 
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
@@ -34,7 +34,7 @@ import java.util.concurrent.Executor;
  */
 public class MainActivity extends AppCompatActivity {
 
-    private static final String TAG = "BluetoothHID";
+    private static final String TAG = "Utils";
     private static final int REQUEST_BLUETOOTH_PERMISSIONS = 2;
     private static final String UNKNOWN_DEVICE_NAME = "Unknown Device";
 
