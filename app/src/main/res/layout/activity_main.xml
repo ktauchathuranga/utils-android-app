@@ -9,21 +9,29 @@
         android:id="@+id/status_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Not connected"
+        android:text="@string/not_connected"
         android:textSize="18sp" />
 
     <Button
         android:id="@+id/connect_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Connect"
+        android:text="@string/connect"
         android:layout_marginTop="20dp" />
 
     <Button
         android:id="@+id/send_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Send Win+L"
+        android:text="@string/win_l_sent"
+        android:layout_marginTop="20dp"
+        android:enabled="false" />
+
+    <Button
+        android:id="@+id/unlock_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/unlock"
         android:layout_marginTop="20dp"
         android:enabled="false" />
 </LinearLayout>

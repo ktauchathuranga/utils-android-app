@@ -29,7 +29,7 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 
 /**
- * Controls a Bluetooth HID keyboard to send Win+L to a paired device.
+ * Controls a Bluetooth HID keyboard to send Win+L or unlock with Space + predefined text to a paired device.
  * Requires API 28+ due to BluetoothHidDevice usage.
  */
 public class MainActivity extends AppCompatActivity {
@@ -37,6 +37,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "Utils";
     private static final int REQUEST_BLUETOOTH_PERMISSIONS = 2;
     private static final String UNKNOWN_DEVICE_NAME = "Unknown Device";
+    private static final String PREDEFINED_TEXT = "heh hee"; // dont look ane
 
     private BluetoothAdapter bluetoothAdapter;
     private BluetoothHidDevice hidDevice;
@@ -44,6 +45,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView connectionStatusTextView;
     private Button connectToggleButton;
     private Button sendKeyButton;
+    private Button unlockButton;
     private ActivityResultLauncher<Intent> bluetoothEnableLauncher;
 
     // HID descriptor for a keyboard (standard USB HID keyboard report descriptor)
@@ -83,14 +85,56 @@ public class MainActivity extends AppCompatActivity {
     };
 
     // HID report for Win+L press: Left GUI (0x08) + L (0x0F)
-    private static final byte[] REPORT_PRESS = {
+    private static final byte[] REPORT_WIN_L_PRESS = {
             (byte) 0x08, (byte) 0x00, (byte) 0x0F, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00
+    };
+
+    // HID report for Space press: Space key (0x2C)
+    private static final byte[] REPORT_SPACE_PRESS = {
+            (byte) 0x00, (byte) 0x00, (byte) 0x2C, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00
     };
 
     // HID report for key release
     private static final byte[] REPORT_RELEASE = {
             (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00
     };
+
+    // HID key codes for digits (0-9)
+    private static final byte[] DIGIT_KEY_CODES = {
+            (byte) 0x27, // 0
+            (byte) 0x1E, // 1
+            (byte) 0x1F, // 2
+            (byte) 0x20, // 3
+            (byte) 0x21, // 4
+            (byte) 0x22, // 5
+            (byte) 0x23, // 6
+            (byte) 0x24, // 7
+            (byte) 0x25, // 8
+            (byte) 0x26  // 9
+    };
+
+    // HID key codes for lowercase letters (a-z: 0x04-0x1D)
+    private static final byte[] LETTER_KEY_CODES = {
+            0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
+            0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D
+    };
+
+    // Common symbols and their HID codes (with Shift modifier where needed)
+    private static final char[] SYMBOLS = {
+            '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '-', '=', '+', '[', ']', '\\',
+            ';', '\'', ',', '.', '/', '`', '~', '_', '{', '}', '|', ':', '"', '<', '>', '?'
+    };
+    private static final byte[] SYMBOL_KEY_CODES = {
+            0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x2D, 0x2E, 0x2E, 0x2F, 0x30, 0x31,
+            0x33, 0x34, 0x36, 0x37, 0x38, 0x35, 0x23, 0x2D, 0x2F, 0x30, 0x31, 0x33, 0x34, 0x36, 0x37, 0x38
+    };
+    private static final boolean[] SYMBOL_REQUIRES_SHIFT = {
+            true, true, true, true, true, true, true, true, true, true, false, false, true, false, false, false,
+            false, false, false, false, false, false, true, true, true, true, true, true, true, true, true, true
+    };
+
+    // Modifier key for Shift (Left Shift: 0x02)
+    private static final byte SHIFT_MODIFIER = (byte) 0x02;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -104,12 +148,14 @@ public class MainActivity extends AppCompatActivity {
 
         connectToggleButton.setOnClickListener(v -> toggleConnection());
         sendKeyButton.setOnClickListener(v -> sendWinLCommand());
+        unlockButton.setOnClickListener(v -> sendUnlockCommand());
     }
 
     private void initializeUiElements() {
         connectionStatusTextView = findViewById(R.id.status_text);
         connectToggleButton = findViewById(R.id.connect_button);
         sendKeyButton = findViewById(R.id.send_button);
+        unlockButton = findViewById(R.id.unlock_button);
     }
 
     private void initializeBluetoothAdapter() {
@@ -261,7 +307,7 @@ public class MainActivity extends AppCompatActivity {
         if (!canPerformBluetoothOperation()) return;
         if (connectedDevice != null && hidDevice != null) {
             try {
-                hidDevice.sendReport(connectedDevice, 0, REPORT_PRESS);
+                hidDevice.sendReport(connectedDevice, 0, REPORT_WIN_L_PRESS);
                 hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
                 showToast(R.string.win_l_sent);
             } catch (SecurityException e) {
@@ -274,6 +320,68 @@ public class MainActivity extends AppCompatActivity {
         } else {
             showToast(R.string.not_connected);
         }
+    }
+
+    private void sendUnlockCommand() {
+        if (!canPerformBluetoothOperation()) return;
+        if (connectedDevice != null && hidDevice != null) {
+            try {
+                // Press and release Space key
+                hidDevice.sendReport(connectedDevice, 0, REPORT_SPACE_PRESS);
+                Thread.sleep(50); // Small delay to simulate key press
+                hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                Thread.sleep(400);
+
+                // Type predefined text (e.g., "Pass123!")
+                for (char c : PREDEFINED_TEXT.toCharArray()) {
+                    byte[] report = getHidReport(c);
+                    hidDevice.sendReport(connectedDevice, 0, report);
+                    Thread.sleep(20); // Simulate typing speed
+                    hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                    Thread.sleep(20);
+                }
+                showToast("Unlocked with Space + " + PREDEFINED_TEXT);
+            } catch (SecurityException e) {
+                Log.e(TAG, "Failed to send Unlock command", e);
+                showToast(R.string.send_command_failed_permission);
+            } catch (InterruptedException e) {
+                Log.e(TAG, "Interrupted while sending Unlock command", e);
+                Thread.currentThread().interrupt();
+                showToast(R.string.send_command_failed_generic);
+            } catch (Exception e) {
+                Log.e(TAG, "Unexpected error sending Unlock command", e);
+                showToast(R.string.send_command_failed_generic);
+            }
+        } else {
+            showToast(R.string.not_connected);
+        }
+    }
+
+    private byte[] getHidReport(char c) {
+        byte modifier = 0x00;
+        byte keyCode;
+
+        if (c >= '0' && c <= '9') {
+            keyCode = DIGIT_KEY_CODES[c - '0'];
+        } else if (c >= 'a' && c <= 'z') {
+            keyCode = LETTER_KEY_CODES[c - 'a'];
+        } else if (c >= 'A' && c <= 'Z') {
+            modifier = SHIFT_MODIFIER; // Use Shift for uppercase
+            keyCode = LETTER_KEY_CODES[c - 'A'];
+        } else {
+            // Check symbols
+            for (int i = 0; i < SYMBOLS.length; i++) {
+                if (c == SYMBOLS[i]) {
+                    keyCode = SYMBOL_KEY_CODES[i];
+                    if (SYMBOL_REQUIRES_SHIFT[i]) {
+                        modifier = SHIFT_MODIFIER;
+                    }
+                    return new byte[] {modifier, 0x00, keyCode, 0x00, 0x00, 0x00, 0x00, 0x00};
+                }
+            }
+            throw new IllegalArgumentException("Unsupported character: " + c);
+        }
+        return new byte[] {modifier, 0x00, keyCode, 0x00, 0x00, 0x00, 0x00, 0x00};
     }
 
     private void registerHidDevice() {
@@ -332,6 +440,7 @@ public class MainActivity extends AppCompatActivity {
                     connectToggleButton.setText(R.string.disconnect);
                     connectToggleButton.setEnabled(true);
                     sendKeyButton.setEnabled(true);
+                    unlockButton.setEnabled(true); // Enable Unlock button when connected
                     showToast(getString(R.string.connected_to, deviceName));
                     break;
                 case BluetoothProfile.STATE_DISCONNECTED:
@@ -340,6 +449,7 @@ public class MainActivity extends AppCompatActivity {
                     connectToggleButton.setText(R.string.connect);
                     connectToggleButton.setEnabled(true);
                     sendKeyButton.setEnabled(false);
+                    unlockButton.setEnabled(false); // Disable Unlock button when disconnected
                     showToast(R.string.disconnected);
                     break;
                 case BluetoothProfile.STATE_CONNECTING:
