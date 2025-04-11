@@ -3,7 +3,30 @@
     <style name="Base.Theme.Utils" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Customize your light theme here. -->
         <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <!-- Futuristic lavender theme -->
+        <item name="colorPrimary">@color/futuristic_lavender_primary</item>
+        <item name="colorPrimaryVariant">@color/futuristic_lavender_secondary</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/futuristic_lavender_secondary</item>
+        <item name="colorSecondaryVariant">@color/futuristic_lavender_primary</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="android:background">@drawable/light_lavender_gradient</item>
+        <item name="android:textColorPrimary">@color/futuristic_lavender_text</item>
+        <!-- Button styling -->
+        <item name="materialButtonStyle">@style/FuturisticButton</item>
+        <item name="android:fontFamily">@font/orbitron</item>
+        <item name="fontFamily">@font/orbitron</item>
     </style>
 
     <style name="Theme.Utils" parent="Base.Theme.Utils" />
+
+    <!-- Custom button style -->
+    <style name="FuturisticButton" parent="Widget.MaterialComponents.Button">
+        <item name="android:backgroundTint">@color/futuristic_lavender_primary</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="cornerRadius">12dp</item>
+        <item name="elevation">4dp</item>
+        <item name="rippleColor">@color/futuristic_lavender_secondary</item>
+        <item name="android:fontFamily">@font/orbitron</item>
+    </style>
 </resources>

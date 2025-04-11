@@ -1,6 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
+    <!-- Light mode colors -->
+    <color name="futuristic_lavender_primary">#D8BFD8</color> <!-- Vibrant lavender for buttons -->
+    <color name="futuristic_lavender_secondary">#B19CD9</color> <!-- Deeper lavender for accents -->
+    <color name="futuristic_lavender_text">#6A5ACD</color> <!-- Dark lavender for text -->
+    <color name="light_lavender_background_start">#F5F0FF</color> <!-- Gradient start -->
+    <color name="light_lavender_background_end">#E6E6FA</color> <!-- Gradient end -->
+
+    <!-- Dark mode colors -->
+    <color name="futuristic_lavender_neon">#C71585</color> <!-- Neon lavender for buttons -->
+    <color name="futuristic_lavender_muted">#9370DB</color> <!-- Muted purple for accents -->
+    <color name="futuristic_lavender_text_light">#E6E6FA</color> <!-- Light lavender for text -->
+    <color name="dark_cosmic_background_start">#1C2526</color> <!-- Dark cosmic gradient start -->
+    <color name="dark_cosmic_background_end">#2F2E41</color> <!-- Dark cosmic gradient end -->
+
+    <!-- General -->
     <color name="white">#FFFFFFFF</color>
-    <color name="lavender">#8692f7</color>
+    <color name="black">#FF000000</color>
 </resources>

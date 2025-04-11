@@ -3,5 +3,30 @@
     <style name="Base.Theme.Utils" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Customize your dark theme here. -->
         <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+        <!-- Futuristic dark lavender theme -->
+        <item name="colorPrimary">@color/futuristic_lavender_neon</item>
+        <item name="colorPrimaryVariant">@color/futuristic_lavender_muted</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/futuristic_lavender_muted</item>
+        <item name="colorSecondaryVariant">@color/futuristic_lavender_neon</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="android:background">@drawable/dark_cosmic_gradient</item>
+        <item name="android:textColorPrimary">@color/futuristic_lavender_text_light</item>
+        <!-- Button styling -->
+        <item name="materialButtonStyle">@style/FuturisticButtonDark</item>
+        <item name="android:fontFamily">@font/orbitron</item>
+        <item name="fontFamily">@font/orbitron</item>
+    </style>
+
+    <style name="Theme.Utils" parent="Base.Theme.Utils" />
+
+    <!-- Custom button style for dark mode -->
+    <style name="FuturisticButtonDark" parent="Widget.MaterialComponents.Button">
+        <item name="android:backgroundTint">@color/futuristic_lavender_neon</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="cornerRadius">12dp</item>
+        <item name="elevation">4dp</item>
+        <item name="rippleColor">@color/futuristic_lavender_muted</item>
+        <item name="android:fontFamily">@font/orbitron</item>
     </style>
 </resources>
