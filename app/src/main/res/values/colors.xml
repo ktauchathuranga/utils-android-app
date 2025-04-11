@@ -4,8 +4,8 @@
     <color name="futuristic_lavender_primary">#D8BFD8</color> <!-- Vibrant lavender for buttons -->
     <color name="futuristic_lavender_secondary">#B19CD9</color> <!-- Deeper lavender for accents -->
     <color name="futuristic_lavender_text">#6A5ACD</color> <!-- Dark lavender for text -->
-    <color name="light_lavender_background_start">#F5F0FF</color> <!-- Gradient start -->
-    <color name="light_lavender_background_end">#E6E6FA</color> <!-- Gradient end -->
+    <color name="light_lavender_background_start">#E59BD7</color> <!-- Gradient start -->
+    <color name="light_lavender_background_end">#9CADDA</color> <!-- Gradient end -->
 
     <!-- Dark mode colors -->
     <color name="futuristic_lavender_neon">#C71585</color> <!-- Neon lavender for buttons -->
