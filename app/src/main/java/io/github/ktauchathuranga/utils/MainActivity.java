@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothHidDevice;
 import android.bluetooth.BluetoothHidDeviceAppSdpSettings;
 import android.bluetooth.BluetoothProfile;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
@@ -27,17 +28,20 @@ import androidx.core.content.ContextCompat;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 /**
- * Controls a Bluetooth HID keyboard to send Win+L or unlock with Space + predefined text to a paired device.
- * Requires API 28+ due to BluetoothHidDevice usage.
+ * A Bluetooth HID keyboard controller that sends Win+L or unlocks with Space + predefined text.
+ * Supports lowercase, uppercase, numbers, and symbols. Requires API 28+ for BluetoothHidDevice.
  */
 public class MainActivity extends AppCompatActivity {
 
-    private static final String TAG = "Utils";
+    private static final String TAG = "BluetoothHID";
     private static final int REQUEST_BLUETOOTH_PERMISSIONS = 2;
     private static final String UNKNOWN_DEVICE_NAME = "Unknown Device";
-    private static final String PREDEFINED_TEXT = "heh hee"; // dont look ane
+    private static final String PREDEFINED_TEXT = "Pass123!"; // Example password, configurable
+    private static final int CONNECT_RETRY_DELAY_MS = 1000; // Retry delay for HID service
+    private static final int MAX_CONNECT_RETRIES = 3; // Max retries for connection
 
     private BluetoothAdapter bluetoothAdapter;
     private BluetoothHidDevice hidDevice;
@@ -47,8 +51,11 @@ public class MainActivity extends AppCompatActivity {
     private Button sendKeyButton;
     private Button unlockButton;
     private ActivityResultLauncher<Intent> bluetoothEnableLauncher;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Executor backgroundExecutor = Executors.newSingleThreadExecutor();
+    private volatile boolean isHidServiceReady = false;
 
-    // HID descriptor for a keyboard (standard USB HID keyboard report descriptor)
+    // HID descriptor for a standard USB keyboard
     private static final byte[] HID_DESCRIPTOR = {
             (byte) 0x05, (byte) 0x01, // USAGE_PAGE (Generic Desktop)
             (byte) 0x09, (byte) 0x06, // USAGE (Keyboard)
@@ -84,56 +91,17 @@ public class MainActivity extends AppCompatActivity {
             (byte) 0xc0              // END_COLLECTION
     };
 
-    // HID report for Win+L press: Left GUI (0x08) + L (0x0F)
-    private static final byte[] REPORT_WIN_L_PRESS = {
-            (byte) 0x08, (byte) 0x00, (byte) 0x0F, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00
-    };
+    // HID reports
+    private static final byte[] REPORT_WIN_L_PRESS = {0x08, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00}; // Left GUI + L
+    private static final byte[] REPORT_SPACE_PRESS = {0x00, 0x00, 0x2C, 0x00, 0x00, 0x00, 0x00, 0x00}; // Space
+    private static final byte[] REPORT_RELEASE = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};     // Key release
 
-    // HID report for Space press: Space key (0x2C)
-    private static final byte[] REPORT_SPACE_PRESS = {
-            (byte) 0x00, (byte) 0x00, (byte) 0x2C, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00
-    };
-
-    // HID report for key release
-    private static final byte[] REPORT_RELEASE = {
-            (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00
-    };
-
-    // HID key codes for digits (0-9)
-    private static final byte[] DIGIT_KEY_CODES = {
-            (byte) 0x27, // 0
-            (byte) 0x1E, // 1
-            (byte) 0x1F, // 2
-            (byte) 0x20, // 3
-            (byte) 0x21, // 4
-            (byte) 0x22, // 5
-            (byte) 0x23, // 6
-            (byte) 0x24, // 7
-            (byte) 0x25, // 8
-            (byte) 0x26  // 9
-    };
-
-    // HID key codes for lowercase letters (a-z: 0x04-0x1D)
-    private static final byte[] LETTER_KEY_CODES = {
-            0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
-            0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D
-    };
-
-    // Common symbols and their HID codes (with Shift modifier where needed)
-    private static final char[] SYMBOLS = {
-            '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '-', '=', '+', '[', ']', '\\',
-            ';', '\'', ',', '.', '/', '`', '~', '_', '{', '}', '|', ':', '"', '<', '>', '?'
-    };
-    private static final byte[] SYMBOL_KEY_CODES = {
-            0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x2D, 0x2E, 0x2E, 0x2F, 0x30, 0x31,
-            0x33, 0x34, 0x36, 0x37, 0x38, 0x35, 0x23, 0x2D, 0x2F, 0x30, 0x31, 0x33, 0x34, 0x36, 0x37, 0x38
-    };
-    private static final boolean[] SYMBOL_REQUIRES_SHIFT = {
-            true, true, true, true, true, true, true, true, true, true, false, false, true, false, false, false,
-            false, false, false, false, false, false, true, true, true, true, true, true, true, true, true, true
-    };
-
-    // Modifier key for Shift (Left Shift: 0x02)
+    // HID key codes
+    private static final byte[] DIGIT_KEY_CODES = {(byte) 0x27, (byte) 0x1E, (byte) 0x1F, (byte) 0x20, (byte) 0x21, (byte) 0x22, (byte) 0x23, (byte) 0x24, (byte) 0x25, (byte) 0x26};
+    private static final byte[] LETTER_KEY_CODES = {0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D};
+    private static final char[] SYMBOLS = {'!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '-', '=', '+', '[', ']', '\\', ';', '\'', ',', '.', '/', '`', '~', '_', '{', '}', '|', ':', '"', '<', '>', '?'};
+    private static final byte[] SYMBOL_KEY_CODES = {0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x2D, 0x2E, 0x2E, 0x2F, 0x30, 0x31, 0x33, 0x34, 0x36, 0x37, 0x38, 0x35, 0x23, 0x2D, 0x2F, 0x30, 0x31, 0x33, 0x34, 0x36, 0x37, 0x38};
+    private static final boolean[] SYMBOL_REQUIRES_SHIFT = {true, true, true, true, true, true, true, true, true, true, false, false, true, false, false, false, false, false, false, false, false, false, true, true, true, true, true, true, true, true, true, true};
     private static final byte SHIFT_MODIFIER = (byte) 0x02;
 
     @Override
@@ -156,11 +124,13 @@ public class MainActivity extends AppCompatActivity {
         connectToggleButton = findViewById(R.id.connect_button);
         sendKeyButton = findViewById(R.id.send_button);
         unlockButton = findViewById(R.id.unlock_button);
+        updateUiState(false); // Initial state: disconnected
     }
 
     private void initializeBluetoothAdapter() {
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         if (bluetoothAdapter == null) {
+            Log.e(TAG, "Bluetooth not supported on this device");
             showToast(R.string.bluetooth_not_supported);
             finish();
         }
@@ -169,8 +139,10 @@ public class MainActivity extends AppCompatActivity {
     private void setupBluetoothEnableLauncher() {
         bluetoothEnableLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
             if (result.getResultCode() == RESULT_OK) {
+                Log.d(TAG, "Bluetooth enabled by user");
                 enableBluetoothAndRegisterHid();
             } else {
+                Log.w(TAG, "Bluetooth enable request denied");
                 showToast(R.string.bluetooth_required);
                 finish();
             }
@@ -186,8 +158,10 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         if (!permissionsToRequest.isEmpty()) {
+            Log.d(TAG, "Requesting permissions: " + permissionsToRequest);
             ActivityCompat.requestPermissions(this, permissionsToRequest.toArray(new String[0]), REQUEST_BLUETOOTH_PERMISSIONS);
         } else {
+            Log.d(TAG, "All permissions already granted");
             enableBluetoothAndRegisterHid();
         }
     }
@@ -204,6 +178,7 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean canPerformBluetoothOperation() {
         if (!hasPermission(Manifest.permission.BLUETOOTH_CONNECT)) {
+            Log.w(TAG, "BLUETOOTH_CONNECT permission missing");
             showToast(R.string.bluetooth_permission_required);
             return false;
         }
@@ -213,9 +188,9 @@ public class MainActivity extends AppCompatActivity {
     private String getDeviceName(BluetoothDevice device) {
         try {
             String name = device.getName();
-            return name != null ? name : UNKNOWN_DEVICE_NAME;
+            return name != null && !name.isEmpty() ? name : UNKNOWN_DEVICE_NAME;
         } catch (SecurityException e) {
-            Log.e(TAG, "Failed to get device name", e);
+            Log.e(TAG, "Failed to get device name: " + e.getMessage(), e);
             return UNKNOWN_DEVICE_NAME;
         }
     }
@@ -223,8 +198,10 @@ public class MainActivity extends AppCompatActivity {
     private void enableBluetoothAndRegisterHid() {
         if (!canPerformBluetoothOperation()) return;
         if (!bluetoothAdapter.isEnabled()) {
+            Log.d(TAG, "Bluetooth disabled, requesting enable");
             bluetoothEnableLauncher.launch(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE));
         } else {
+            Log.d(TAG, "Bluetooth enabled, registering HID device");
             registerHidDevice();
         }
     }
@@ -238,123 +215,165 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showDeviceSelectionDialog() {
-        if (hidDevice == null) {
+        if (!canPerformBluetoothOperation()) return;
+        if (!isHidServiceReady || hidDevice == null) {
+            Log.w(TAG, "HID service not ready for device selection");
             showToast(R.string.hid_service_not_ready);
+            registerHidDevice(); // Attempt to initialize
             return;
         }
-        if (!canPerformBluetoothOperation()) return;
 
-        try {
-            Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
-            if (pairedDevices.isEmpty()) {
-                showToast(R.string.no_paired_devices);
-                return;
+        backgroundExecutor.execute(() -> {
+            try {
+                Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
+                if (pairedDevices.isEmpty()) {
+                    Log.w(TAG, "No paired devices found");
+                    showToast(R.string.no_paired_devices);
+                    return;
+                }
+
+                ArrayList<String> deviceNames = new ArrayList<>();
+                ArrayList<BluetoothDevice> deviceList = new ArrayList<>(pairedDevices);
+                for (BluetoothDevice device : pairedDevices) {
+                    String name = getDeviceName(device);
+                    deviceNames.add(name + " (" + device.getAddress() + ")");
+                }
+
+                runOnUiThread(() -> new AlertDialog.Builder(this)
+                        .setTitle(R.string.select_device_title)
+                        .setItems(deviceNames.toArray(new String[0]), (dialog, which) -> connectToDevice(deviceList.get(which), 0))
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .setCancelable(true)
+                        .show());
+            } catch (SecurityException e) {
+                Log.e(TAG, "Failed to access paired devices: " + e.getMessage(), e);
+                showToast(R.string.permission_denied_paired_devices);
+            } catch (Exception e) {
+                Log.e(TAG, "Unexpected error in device selection: " + e.getMessage(), e);
+                showToast(R.string.connection_failed_generic);
             }
-
-            ArrayList<String> deviceNames = new ArrayList<>();
-            ArrayList<BluetoothDevice> deviceList = new ArrayList<>(pairedDevices);
-            for (BluetoothDevice device : pairedDevices) {
-                String name = getDeviceName(device);
-                deviceNames.add(name + " (" + device.getAddress() + ")");
-            }
-
-            new AlertDialog.Builder(this)
-                    .setTitle(R.string.select_device_title)
-                    .setItems(deviceNames.toArray(new String[0]), (dialog, which) -> connectToDevice(deviceList.get(which)))
-                    .setNegativeButton(android.R.string.cancel, null)
-                    .show();
-        } catch (SecurityException e) {
-            Log.e(TAG, "Failed to access paired devices", e);
-            showToast(R.string.permission_denied_paired_devices);
-        }
+        });
     }
 
-    private void connectToDevice(BluetoothDevice device) {
+    private void connectToDevice(BluetoothDevice device, int retryCount) {
         if (!canPerformBluetoothOperation()) return;
         String deviceName = getDeviceName(device);
+        Log.d(TAG, "Connecting to " + deviceName + " (Retry " + retryCount + ")");
         showToast(getString(R.string.connecting_to, deviceName));
         connectToggleButton.setEnabled(false);
-        try {
-            hidDevice.connect(device);
-        } catch (SecurityException e) {
-            Log.e(TAG, "Failed to connect to " + deviceName, e);
-            showToast(R.string.connection_failed_permission);
-            connectToggleButton.setEnabled(true);
-        } catch (Exception e) {
-            Log.e(TAG, "Unexpected error connecting to " + deviceName, e);
-            showToast(R.string.connection_failed_generic);
-            connectToggleButton.setEnabled(true);
+
+        if (!isHidServiceReady || hidDevice == null) {
+            if (retryCount < MAX_CONNECT_RETRIES) {
+                Log.w(TAG, "HID service not ready, retrying " + (retryCount + 1) + "/" + MAX_CONNECT_RETRIES);
+                showToast("HID service not ready, retrying...");
+                registerHidDevice();
+                mainHandler.postDelayed(() -> connectToDevice(device, retryCount + 1), CONNECT_RETRY_DELAY_MS);
+            } else {
+                Log.e(TAG, "Max retries reached for HID service initialization");
+                showToast("Failed to initialize HID service after retries");
+                connectToggleButton.setEnabled(true);
+            }
+            return;
         }
+
+        backgroundExecutor.execute(() -> {
+            try {
+                hidDevice.connect(device);
+                Log.d(TAG, "Connection request sent to " + deviceName);
+            } catch (SecurityException e) {
+                Log.e(TAG, "SecurityException connecting to " + deviceName + ": " + e.getMessage(), e);
+                runOnUiThread(() -> {
+                    showToast(R.string.connection_failed_permission);
+                    connectToggleButton.setEnabled(true);
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Unexpected error connecting to " + deviceName + ": " + e.getMessage(), e);
+                runOnUiThread(() -> {
+                    showToast(R.string.connection_failed_generic);
+                    connectToggleButton.setEnabled(true);
+                });
+            }
+        });
     }
 
     private void disconnectDevice() {
-        if (!canPerformBluetoothOperation()) return;
-        if (hidDevice != null && connectedDevice != null) {
+        if (!canPerformBluetoothOperation() || hidDevice == null || connectedDevice == null) return;
+        backgroundExecutor.execute(() -> {
             try {
                 hidDevice.disconnect(connectedDevice);
+                Log.d(TAG, "Disconnect request sent for " + getDeviceName(connectedDevice));
                 showToast(R.string.disconnecting);
             } catch (SecurityException e) {
-                Log.e(TAG, "Failed to disconnect", e);
+                Log.e(TAG, "Failed to disconnect: " + e.getMessage(), e);
                 showToast(R.string.disconnect_failed_permission);
             } catch (Exception e) {
-                Log.e(TAG, "Unexpected error during disconnect", e);
+                Log.e(TAG, "Unexpected error during disconnect: " + e.getMessage(), e);
                 showToast(R.string.disconnect_failed_generic);
             }
-        }
+        });
     }
 
     private void sendWinLCommand() {
-        if (!canPerformBluetoothOperation()) return;
-        if (connectedDevice != null && hidDevice != null) {
+        if (!canPerformBluetoothOperation() || !isConnected()) {
+            showToast(R.string.not_connected);
+            return;
+        }
+        backgroundExecutor.execute(() -> {
             try {
                 hidDevice.sendReport(connectedDevice, 0, REPORT_WIN_L_PRESS);
+                Thread.sleep(50);
                 hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                Log.d(TAG, "Win+L command sent successfully");
                 showToast(R.string.win_l_sent);
             } catch (SecurityException e) {
-                Log.e(TAG, "Failed to send Win+L command", e);
-                showToast(R.string.send_command_failed_permission);
-            } catch (Exception e) {
-                Log.e(TAG, "Unexpected error sending Win+L", e);
-                showToast(R.string.send_command_failed_generic);
-            }
-        } else {
-            showToast(R.string.not_connected);
-        }
-    }
-
-    private void sendUnlockCommand() {
-        if (!canPerformBluetoothOperation()) return;
-        if (connectedDevice != null && hidDevice != null) {
-            try {
-                // Press and release Space key
-                hidDevice.sendReport(connectedDevice, 0, REPORT_SPACE_PRESS);
-                Thread.sleep(50); // Small delay to simulate key press
-                hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
-                Thread.sleep(400);
-
-                // Type predefined text (e.g., "Pass123!")
-                for (char c : PREDEFINED_TEXT.toCharArray()) {
-                    byte[] report = getHidReport(c);
-                    hidDevice.sendReport(connectedDevice, 0, report);
-                    Thread.sleep(20); // Simulate typing speed
-                    hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
-                    Thread.sleep(20);
-                }
-                showToast("Unlocked with Space + " + PREDEFINED_TEXT);
-            } catch (SecurityException e) {
-                Log.e(TAG, "Failed to send Unlock command", e);
+                Log.e(TAG, "Failed to send Win+L: " + e.getMessage(), e);
                 showToast(R.string.send_command_failed_permission);
             } catch (InterruptedException e) {
-                Log.e(TAG, "Interrupted while sending Unlock command", e);
+                Log.w(TAG, "Interrupted while sending Win+L", e);
                 Thread.currentThread().interrupt();
                 showToast(R.string.send_command_failed_generic);
             } catch (Exception e) {
-                Log.e(TAG, "Unexpected error sending Unlock command", e);
+                Log.e(TAG, "Unexpected error sending Win+L: " + e.getMessage(), e);
                 showToast(R.string.send_command_failed_generic);
             }
-        } else {
+        });
+    }
+
+    private void sendUnlockCommand() {
+        if (!canPerformBluetoothOperation() || !isConnected()) {
             showToast(R.string.not_connected);
+            return;
         }
+        backgroundExecutor.execute(() -> {
+            try {
+                // Send Space
+                hidDevice.sendReport(connectedDevice, 0, REPORT_SPACE_PRESS);
+                Thread.sleep(50);
+                hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                Thread.sleep(50);
+
+                // Send predefined text
+                for (char c : PREDEFINED_TEXT.toCharArray()) {
+                    byte[] report = getHidReport(c);
+                    hidDevice.sendReport(connectedDevice, 0, report);
+                    Thread.sleep(50);
+                    hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                    Thread.sleep(50);
+                }
+                Log.d(TAG, "Unlock command sent: Space + " + PREDEFINED_TEXT);
+                showToast("Unlocked with Space + " + PREDEFINED_TEXT);
+            } catch (SecurityException e) {
+                Log.e(TAG, "Failed to send unlock command: " + e.getMessage(), e);
+                showToast(R.string.send_command_failed_permission);
+            } catch (InterruptedException e) {
+                Log.w(TAG, "Interrupted while sending unlock command", e);
+                Thread.currentThread().interrupt();
+                showToast(R.string.send_command_failed_generic);
+            } catch (Exception e) {
+                Log.e(TAG, "Unexpected error sending unlock command: " + e.getMessage(), e);
+                showToast(R.string.send_command_failed_generic);
+            }
+        });
     }
 
     private byte[] getHidReport(char c) {
@@ -366,90 +385,110 @@ public class MainActivity extends AppCompatActivity {
         } else if (c >= 'a' && c <= 'z') {
             keyCode = LETTER_KEY_CODES[c - 'a'];
         } else if (c >= 'A' && c <= 'Z') {
-            modifier = SHIFT_MODIFIER; // Use Shift for uppercase
+            modifier = SHIFT_MODIFIER;
             keyCode = LETTER_KEY_CODES[c - 'A'];
         } else {
-            // Check symbols
             for (int i = 0; i < SYMBOLS.length; i++) {
                 if (c == SYMBOLS[i]) {
                     keyCode = SYMBOL_KEY_CODES[i];
                     if (SYMBOL_REQUIRES_SHIFT[i]) {
                         modifier = SHIFT_MODIFIER;
                     }
-                    return new byte[] {modifier, 0x00, keyCode, 0x00, 0x00, 0x00, 0x00, 0x00};
+                    return new byte[]{modifier, 0x00, keyCode, 0x00, 0x00, 0x00, 0x00, 0x00};
                 }
             }
             throw new IllegalArgumentException("Unsupported character: " + c);
         }
-        return new byte[] {modifier, 0x00, keyCode, 0x00, 0x00, 0x00, 0x00, 0x00};
+        return new byte[]{modifier, 0x00, keyCode, 0x00, 0x00, 0x00, 0x00, 0x00};
     }
 
     private void registerHidDevice() {
         if (!canPerformBluetoothOperation()) return;
-        try {
-            bluetoothAdapter.getProfileProxy(this, new BluetoothProfile.ServiceListener() {
-                @Override
-                public void onServiceConnected(int profile, BluetoothProfile proxy) {
-                    if (profile != BluetoothProfile.HID_DEVICE) return;
-                    hidDevice = (BluetoothHidDevice) proxy;
-                    BluetoothHidDeviceAppSdpSettings sdp = new BluetoothHidDeviceAppSdpSettings(
-                            "My Keyboard", "Virtual Keyboard", "MyCompany", (byte) 0x40, HID_DESCRIPTOR
-                    );
-                    try {
-                        hidDevice.registerApp(sdp, null, null, new MainThreadExecutor(), new HidCallback());
-                    } catch (SecurityException e) {
-                        Log.e(TAG, "Failed to register HID app", e);
-                        showToast(R.string.hid_registration_failed_permission);
-                    } catch (Exception e) {
-                        Log.e(TAG, "Unexpected error registering HID app", e);
-                        showToast(R.string.hid_registration_failed_generic);
+        backgroundExecutor.execute(() -> {
+            try {
+                bluetoothAdapter.getProfileProxy(this, new BluetoothProfile.ServiceListener() {
+                    @Override
+                    public void onServiceConnected(int profile, BluetoothProfile proxy) {
+                        if (profile != BluetoothProfile.HID_DEVICE) return;
+                        hidDevice = (BluetoothHidDevice) proxy;
+                        Log.d(TAG, "HID service connected");
+                        BluetoothHidDeviceAppSdpSettings sdp = new BluetoothHidDeviceAppSdpSettings(
+                                "BluetoothHIDKeyboard", "Virtual Keyboard", "xAI", (byte) 0x40, HID_DESCRIPTOR
+                        );
+                        try {
+                            hidDevice.registerApp(sdp, null, null, new MainThreadExecutor(), new HidCallback());
+                        } catch (SecurityException e) {
+                            Log.e(TAG, "Failed to register HID app: " + e.getMessage(), e);
+                            showToast(R.string.hid_registration_failed_permission);
+                        } catch (Exception e) {
+                            Log.e(TAG, "Unexpected error registering HID app: " + e.getMessage(), e);
+                            showToast(R.string.hid_registration_failed_generic);
+                        }
                     }
-                }
 
-                @Override
-                public void onServiceDisconnected(int profile) {
-                    if (profile == BluetoothProfile.HID_DEVICE) {
-                        hidDevice = null;
-                        showToast(R.string.hid_service_disconnected);
+                    @Override
+                    public void onServiceDisconnected(int profile) {
+                        if (profile == BluetoothProfile.HID_DEVICE) {
+                            Log.w(TAG, "HID service disconnected");
+                            hidDevice = null;
+                            isHidServiceReady = false;
+                            showToast(R.string.hid_service_disconnected);
+                            updateUiState(false);
+                        }
                     }
-                }
-            }, BluetoothProfile.HID_DEVICE);
-        } catch (SecurityException e) {
-            Log.e(TAG, "Failed to initialize HID service", e);
-            showToast(R.string.hid_service_init_failed_permission);
-        } catch (Exception e) {
-            Log.e(TAG, "Unexpected error initializing HID service", e);
-            showToast(R.string.hid_service_init_failed_generic);
-        }
+                }, BluetoothProfile.HID_DEVICE);
+            } catch (SecurityException e) {
+                Log.e(TAG, "Failed to initialize HID service: " + e.getMessage(), e);
+                showToast(R.string.hid_service_init_failed_permission);
+            } catch (Exception e) {
+                Log.e(TAG, "Unexpected error initializing HID service: " + e.getMessage(), e);
+                showToast(R.string.hid_service_init_failed_generic);
+            }
+        });
+    }
+
+    private boolean isConnected() {
+        return connectedDevice != null && hidDevice != null && isHidServiceReady;
+    }
+
+    private void updateUiState(boolean isConnected) {
+        runOnUiThread(() -> {
+            if (isConnected && connectedDevice != null) {
+                connectionStatusTextView.setText(getString(R.string.connected_to, getDeviceName(connectedDevice)));
+                connectToggleButton.setText(R.string.disconnect);
+                sendKeyButton.setEnabled(true);
+                unlockButton.setEnabled(true);
+            } else {
+                connectionStatusTextView.setText(R.string.not_connected);
+                connectToggleButton.setText(R.string.connect);
+                sendKeyButton.setEnabled(false);
+                unlockButton.setEnabled(false);
+            }
+            connectToggleButton.setEnabled(true);
+        });
     }
 
     private class HidCallback extends BluetoothHidDevice.Callback {
         @Override
         public void onAppStatusChanged(BluetoothDevice pluggedDevice, boolean registered) {
+            Log.d(TAG, "HID app status changed: registered=" + registered);
+            isHidServiceReady = registered;
             showToast(registered ? R.string.hid_registered_success : R.string.hid_registration_failed);
         }
 
         @Override
         public void onConnectionStateChanged(BluetoothDevice device, int state) {
-            String deviceName = device != null ? getDeviceName(device) : "device";
+            String deviceName = getDeviceName(device);
             Log.d(TAG, "Connection state changed to " + state + " for " + deviceName);
             switch (state) {
                 case BluetoothProfile.STATE_CONNECTED:
                     connectedDevice = device;
-                    connectionStatusTextView.setText(getString(R.string.connected_to, deviceName));
-                    connectToggleButton.setText(R.string.disconnect);
-                    connectToggleButton.setEnabled(true);
-                    sendKeyButton.setEnabled(true);
-                    unlockButton.setEnabled(true); // Enable Unlock button when connected
+                    updateUiState(true);
                     showToast(getString(R.string.connected_to, deviceName));
                     break;
                 case BluetoothProfile.STATE_DISCONNECTED:
                     connectedDevice = null;
-                    connectionStatusTextView.setText(R.string.not_connected);
-                    connectToggleButton.setText(R.string.connect);
-                    connectToggleButton.setEnabled(true);
-                    sendKeyButton.setEnabled(false);
-                    unlockButton.setEnabled(false); // Disable Unlock button when disconnected
+                    updateUiState(false);
                     showToast(R.string.disconnected);
                     break;
                 case BluetoothProfile.STATE_CONNECTING:
@@ -485,8 +524,10 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
             if (allGranted) {
+                Log.d(TAG, "All permissions granted, proceeding");
                 enableBluetoothAndRegisterHid();
             } else {
+                Log.w(TAG, "Permissions denied, exiting");
                 showToast(R.string.bluetooth_permissions_required);
                 finish();
             }
@@ -497,14 +538,17 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         if (hidDevice != null && hasPermission(Manifest.permission.BLUETOOTH_CONNECT)) {
-            try {
-                hidDevice.unregisterApp();
-                bluetoothAdapter.closeProfileProxy(BluetoothProfile.HID_DEVICE, hidDevice);
-            } catch (SecurityException e) {
-                Log.e(TAG, "Failed to unregister HID app", e);
-            } catch (Exception e) {
-                Log.e(TAG, "Unexpected error during cleanup", e);
-            }
+            backgroundExecutor.execute(() -> {
+                try {
+                    hidDevice.unregisterApp();
+                    bluetoothAdapter.closeProfileProxy(BluetoothProfile.HID_DEVICE, hidDevice);
+                    Log.d(TAG, "HID app unregistered and proxy closed");
+                } catch (SecurityException e) {
+                    Log.e(TAG, "Failed to unregister HID app: " + e.getMessage(), e);
+                } catch (Exception e) {
+                    Log.e(TAG, "Unexpected error during cleanup: " + e.getMessage(), e);
+                }
+            });
         }
     }
 
