@@ -16,6 +16,13 @@
         <item name="materialButtonStyle">@style/FuturisticButton</item>
         <item name="android:fontFamily">@font/orbitron</item>
         <item name="fontFamily">@font/orbitron</item>
+
+        <item name="buttonBarPositiveButtonStyle">@style/DialogButton</item>
+        <item name="buttonBarNegativeButtonStyle">@style/DialogButton</item>
+    </style>
+
+    <style name="DialogButton" parent="Widget.MaterialComponents.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/white</item>
     </style>
 
     <style name="Theme.Utils" parent="Base.Theme.Utils" />
