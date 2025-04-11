@@ -14,6 +14,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -24,24 +25,29 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.security.crypto.EncryptedSharedPreferences;
+import androidx.security.crypto.MasterKey;
 
+import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 /**
- * A Bluetooth HID keyboard controller that sends Win+L or unlocks with Space + predefined text.
- * Supports lowercase, uppercase, numbers, and symbols. Requires API 28+ for BluetoothHidDevice.
+ * A Bluetooth HID keyboard controller that sends Win+L or unlocks with Space + user-defined password.
+ * Password is stored securely using EncryptedSharedPreferences. Requires API 28+.
  */
 public class MainActivity extends AppCompatActivity {
 
-    private static final String TAG = "BluetoothHID";
+    private static final String TAG = "Utils";
     private static final int REQUEST_BLUETOOTH_PERMISSIONS = 2;
     private static final String UNKNOWN_DEVICE_NAME = "Unknown Device";
-    private static final String PREDEFINED_TEXT = "Pass123!"; // Example password, configurable
-    private static final int CONNECT_RETRY_DELAY_MS = 1000; // Retry delay for HID service
-    private static final int MAX_CONNECT_RETRIES = 3; // Max retries for connection
+    private static final int CONNECT_RETRY_DELAY_MS = 1000;
+    private static final int MAX_CONNECT_RETRIES = 3;
+    private static final String PREFS_NAME = "UtilsPrefs";
+    private static final String KEY_PASSWORD = "unlock_password";
 
     private BluetoothAdapter bluetoothAdapter;
     private BluetoothHidDevice hidDevice;
@@ -50,10 +56,12 @@ public class MainActivity extends AppCompatActivity {
     private Button connectToggleButton;
     private Button sendKeyButton;
     private Button unlockButton;
+    private Button changePasswordButton;
     private ActivityResultLauncher<Intent> bluetoothEnableLauncher;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Executor backgroundExecutor = Executors.newSingleThreadExecutor();
     private volatile boolean isHidServiceReady = false;
+    private EncryptedSharedPreferences encryptedPrefs;
 
     // HID descriptor for a standard USB keyboard
     private static final byte[] HID_DESCRIPTOR = {
@@ -109,6 +117,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        initializeEncryptedPrefs();
         initializeUiElements();
         initializeBluetoothAdapter();
         setupBluetoothEnableLauncher();
@@ -117,6 +126,27 @@ public class MainActivity extends AppCompatActivity {
         connectToggleButton.setOnClickListener(v -> toggleConnection());
         sendKeyButton.setOnClickListener(v -> sendWinLCommand());
         unlockButton.setOnClickListener(v -> sendUnlockCommand());
+        changePasswordButton.setOnClickListener(v -> showChangePasswordDialog());
+    }
+
+    private void initializeEncryptedPrefs() {
+        try {
+            MasterKey masterKey = new MasterKey.Builder(this)
+                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                    .build();
+            encryptedPrefs = (EncryptedSharedPreferences) EncryptedSharedPreferences.create(
+                    this,
+                    PREFS_NAME,
+                    masterKey,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            );
+            Log.d(TAG, "EncryptedSharedPreferences initialized successfully");
+        } catch (GeneralSecurityException | IOException e) {
+            Log.e(TAG, "Failed to initialize EncryptedSharedPreferences: " + e.getMessage(), e);
+            showToast("Failed to initialize secure storage");
+            finish();
+        }
     }
 
     private void initializeUiElements() {
@@ -124,7 +154,8 @@ public class MainActivity extends AppCompatActivity {
         connectToggleButton = findViewById(R.id.connect_button);
         sendKeyButton = findViewById(R.id.send_button);
         unlockButton = findViewById(R.id.unlock_button);
-        updateUiState(false); // Initial state: disconnected
+        changePasswordButton = findViewById(R.id.change_password_button);
+        updateUiState(false);
     }
 
     private void initializeBluetoothAdapter() {
@@ -219,7 +250,7 @@ public class MainActivity extends AppCompatActivity {
         if (!isHidServiceReady || hidDevice == null) {
             Log.w(TAG, "HID service not ready for device selection");
             showToast(R.string.hid_service_not_ready);
-            registerHidDevice(); // Attempt to initialize
+            registerHidDevice();
             return;
         }
 
@@ -325,6 +356,11 @@ public class MainActivity extends AppCompatActivity {
                 hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
                 Log.d(TAG, "Win+L command sent successfully");
                 showToast(R.string.win_l_sent);
+                // Prompt for password if not set (assuming Win+L might precede an unlock)
+                String storedPassword = encryptedPrefs.getString(KEY_PASSWORD, null);
+                if (storedPassword == null) {
+                    runOnUiThread(this::showPasswordInputDialog);
+                }
             } catch (SecurityException e) {
                 Log.e(TAG, "Failed to send Win+L: " + e.getMessage(), e);
                 showToast(R.string.send_command_failed_permission);
@@ -344,24 +380,33 @@ public class MainActivity extends AppCompatActivity {
             showToast(R.string.not_connected);
             return;
         }
+        String storedPassword = encryptedPrefs.getString(KEY_PASSWORD, null);
+        if (storedPassword == null) {
+            showPasswordInputDialog();
+            return;
+        }
+        sendUnlockWithPassword(storedPassword);
+    }
+
+    private void sendUnlockWithPassword(String password) {
         backgroundExecutor.execute(() -> {
             try {
                 // Send Space
                 hidDevice.sendReport(connectedDevice, 0, REPORT_SPACE_PRESS);
                 Thread.sleep(50);
                 hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
-                Thread.sleep(50);
+                Thread.sleep(400);
 
-                // Send predefined text
-                for (char c : PREDEFINED_TEXT.toCharArray()) {
+                // Send password
+                for (char c : password.toCharArray()) {
                     byte[] report = getHidReport(c);
                     hidDevice.sendReport(connectedDevice, 0, report);
-                    Thread.sleep(50);
+                    Thread.sleep(20);
                     hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
-                    Thread.sleep(50);
+                    Thread.sleep(20);
                 }
-                Log.d(TAG, "Unlock command sent: Space + " + PREDEFINED_TEXT);
-                showToast("Unlocked with Space + " + PREDEFINED_TEXT);
+                Log.d(TAG, "Unlock command sent: Space + [password]");
+                showToast("Unlocked with stored password");
             } catch (SecurityException e) {
                 Log.e(TAG, "Failed to send unlock command: " + e.getMessage(), e);
                 showToast(R.string.send_command_failed_permission);
@@ -400,6 +445,65 @@ public class MainActivity extends AppCompatActivity {
             throw new IllegalArgumentException("Unsupported character: " + c);
         }
         return new byte[]{modifier, 0x00, keyCode, 0x00, 0x00, 0x00, 0x00, 0x00};
+    }
+
+    private void showPasswordInputDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Enter Unlock Password");
+
+        final EditText input = new EditText(this);
+        input.setHint("Password");
+        builder.setView(input);
+
+        builder.setPositiveButton("Save", (dialog, which) -> {
+            String password = input.getText().toString().trim();
+            if (password.isEmpty()) {
+                showToast("Password cannot be empty");
+                return;
+            }
+            try {
+                encryptedPrefs.edit().putString(KEY_PASSWORD, password).apply();
+                Log.d(TAG, "Password saved securely");
+                showToast("Password saved");
+                if (isConnected()) {
+                    sendUnlockWithPassword(password); // Send immediately if connected
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to save password: " + e.getMessage(), e);
+                showToast("Failed to save password");
+            }
+        });
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
+        builder.setCancelable(false);
+        builder.show();
+    }
+
+    private void showChangePasswordDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Change Unlock Password");
+
+        final EditText input = new EditText(this);
+        input.setHint("New Password");
+        builder.setView(input);
+
+        builder.setPositiveButton("Update", (dialog, which) -> {
+            String newPassword = input.getText().toString().trim();
+            if (newPassword.isEmpty()) {
+                showToast("Password cannot be empty");
+                return;
+            }
+            try {
+                encryptedPrefs.edit().putString(KEY_PASSWORD, newPassword).apply();
+                Log.d(TAG, "Password updated securely");
+                showToast("Password updated");
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to update password: " + e.getMessage(), e);
+                showToast("Failed to update password");
+            }
+        });
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
+        builder.setCancelable(true);
+        builder.show();
     }
 
     private void registerHidDevice() {
@@ -458,11 +562,13 @@ public class MainActivity extends AppCompatActivity {
                 connectToggleButton.setText(R.string.disconnect);
                 sendKeyButton.setEnabled(true);
                 unlockButton.setEnabled(true);
+                changePasswordButton.setEnabled(true);
             } else {
                 connectionStatusTextView.setText(R.string.not_connected);
                 connectToggleButton.setText(R.string.connect);
                 sendKeyButton.setEnabled(false);
                 unlockButton.setEnabled(false);
+                changePasswordButton.setEnabled(true); // Always allow password change
             }
             connectToggleButton.setEnabled(true);
         });

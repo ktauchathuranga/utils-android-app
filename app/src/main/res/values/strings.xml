@@ -1,6 +1,5 @@
 <resources>
     <string name="app_name">Utils</string>
-    <string name="unlock">Unlock</string>
     <string name="bluetooth_not_supported">Bluetooth not supported on this device</string>
     <string name="bluetooth_required">Bluetooth is required to use this app</string>
     <string name="bluetooth_permission_required">Bluetooth permission required</string>
@@ -14,7 +13,9 @@
     <string name="disconnecting">Disconnecting...</string>
     <string name="disconnect_failed_permission">Failed to disconnect due to permission issue</string>
     <string name="disconnect_failed_generic">Failed to disconnect unexpectedly</string>
-    <string name="win_l_sent">Win+L sent</string>
+    <string name="win_l_sent">Lock (Win+L)</string>
+    <string name="unlock">Unlock</string>
+    <string name="change_password">Change Password</string>
     <string name="send_command_failed_permission">Failed to send command due to permission issue</string>
     <string name="send_command_failed_generic">Failed to send command unexpectedly</string>
     <string name="not_connected">Not connected to a device</string>
