@@ -501,6 +501,9 @@ public class MainActivity extends AppCompatActivity {
         if (c == ' ') {
             keyCode = (byte) 0x2C; // HID key code for space
             return new byte[]{modifier, 0x00, keyCode, 0x00, 0x00, 0x00, 0x00, 0x00};
+        } else if (c == '\n') {
+            keyCode = (byte) 0x28; // HID key code for Enter
+            return new byte[]{modifier, 0x00, keyCode, 0x00, 0x00, 0x00, 0x00, 0x00};
         } else if (c >= '0' && c <= '9') {
             keyCode = DIGIT_KEY_CODES[c - '0'];
         } else if (c >= 'a' && c <= 'z') {
@@ -522,7 +525,6 @@ public class MainActivity extends AppCompatActivity {
         }
         return new byte[]{modifier, 0x00, keyCode, 0x00, 0x00, 0x00, 0x00, 0x00};
     }
-
     private void showPasswordInputDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Enter Unlock Password");
