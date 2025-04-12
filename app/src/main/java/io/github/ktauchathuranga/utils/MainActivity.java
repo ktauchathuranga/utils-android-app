@@ -469,9 +469,9 @@ public class MainActivity extends AppCompatActivity {
                 for (char c : storedPassword.toCharArray()) {
                     byte[] report = getHidReport(c);
                     hidDevice.sendReport(connectedDevice, 0, report);
-                    Thread.sleep(20);
+                    Thread.sleep(5);
                     hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
-                    Thread.sleep(20);
+                    Thread.sleep(5);
                 }
                 Log.d(TAG, "Password command sent successfully");
                 showToast("Password sent");
