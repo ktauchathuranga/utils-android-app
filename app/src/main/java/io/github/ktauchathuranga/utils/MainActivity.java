@@ -498,7 +498,10 @@ public class MainActivity extends AppCompatActivity {
         byte modifier = 0x00;
         byte keyCode;
 
-        if (c >= '0' && c <= '9') {
+        if (c == ' ') {
+            keyCode = (byte) 0x2C; // HID key code for space
+            return new byte[]{modifier, 0x00, keyCode, 0x00, 0x00, 0x00, 0x00, 0x00};
+        } else if (c >= '0' && c <= '9') {
             keyCode = DIGIT_KEY_CODES[c - '0'];
         } else if (c >= 'a' && c <= 'z') {
             keyCode = LETTER_KEY_CODES[c - 'a'];
