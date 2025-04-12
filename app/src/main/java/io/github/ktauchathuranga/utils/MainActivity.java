@@ -6,7 +6,6 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothHidDevice;
 import android.bluetooth.BluetoothHidDeviceAppSdpSettings;
 import android.bluetooth.BluetoothProfile;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
