@@ -56,6 +56,8 @@ public class MainActivity extends AppCompatActivity {
     private Button connectToggleButton;
     private Button sendKeyButton;
     private Button unlockButton;
+    private Button spaceButton;
+    private Button passwordButton;
     private Button changePasswordButton;
     private ActivityResultLauncher<Intent> bluetoothEnableLauncher;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -127,6 +129,8 @@ public class MainActivity extends AppCompatActivity {
         sendKeyButton.setOnClickListener(v -> sendWinLCommand());
         unlockButton.setOnClickListener(v -> sendUnlockCommand());
         changePasswordButton.setOnClickListener(v -> showChangePasswordDialog());
+        spaceButton.setOnClickListener(v -> sendSpaceCommand());
+        passwordButton.setOnClickListener(v -> sendPasswordCommand());
     }
 
     private void initializeEncryptedPrefs() {
@@ -155,6 +159,8 @@ public class MainActivity extends AppCompatActivity {
         sendKeyButton = findViewById(R.id.send_button);
         unlockButton = findViewById(R.id.unlock_button);
         changePasswordButton = findViewById(R.id.change_password_button);
+        spaceButton = findViewById(R.id.space_button);
+        passwordButton = findViewById(R.id.password_button);
         updateUiState(false);
     }
 
@@ -421,6 +427,68 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void sendSpaceCommand() {
+        if (!canPerformBluetoothOperation() || !isConnected()) {
+            showToast(R.string.not_connected);
+            return;
+        }
+        backgroundExecutor.execute(() -> {
+            try {
+                hidDevice.sendReport(connectedDevice, 0, REPORT_SPACE_PRESS);
+                Thread.sleep(50);
+                hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                Log.d(TAG, "Space command sent successfully");
+                showToast("Space sent");
+            } catch (SecurityException e) {
+                Log.e(TAG, "Failed to send Space: " + e.getMessage(), e);
+                showToast(R.string.send_command_failed_permission);
+            } catch (InterruptedException e) {
+                Log.w(TAG, "Interrupted while sending Space", e);
+                Thread.currentThread().interrupt();
+                showToast(R.string.send_command_failed_generic);
+            } catch (Exception e) {
+                Log.e(TAG, "Unexpected error sending Space: " + e.getMessage(), e);
+                showToast(R.string.send_command_failed_generic);
+            }
+        });
+    }
+
+    private void sendPasswordCommand() {
+        if (!canPerformBluetoothOperation() || !isConnected()) {
+            showToast(R.string.not_connected);
+            return;
+        }
+        String storedPassword = encryptedPrefs.getString(KEY_PASSWORD, null);
+        if (storedPassword == null) {
+            showPasswordInputDialog();
+            return;
+        }
+        backgroundExecutor.execute(() -> {
+            try {
+                // Send password without initial space
+                for (char c : storedPassword.toCharArray()) {
+                    byte[] report = getHidReport(c);
+                    hidDevice.sendReport(connectedDevice, 0, report);
+                    Thread.sleep(20);
+                    hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                    Thread.sleep(20);
+                }
+                Log.d(TAG, "Password command sent successfully");
+                showToast("Password sent");
+            } catch (SecurityException e) {
+                Log.e(TAG, "Failed to send password: " + e.getMessage(), e);
+                showToast(R.string.send_command_failed_permission);
+            } catch (InterruptedException e) {
+                Log.w(TAG, "Interrupted while sending password", e);
+                Thread.currentThread().interrupt();
+                showToast(R.string.send_command_failed_generic);
+            } catch (Exception e) {
+                Log.e(TAG, "Unexpected error sending password: " + e.getMessage(), e);
+                showToast(R.string.send_command_failed_generic);
+            }
+        });
+    }
+
     private byte[] getHidReport(char c) {
         byte modifier = 0x00;
         byte keyCode;
@@ -562,13 +630,17 @@ public class MainActivity extends AppCompatActivity {
                 connectToggleButton.setText(R.string.disconnect);
                 sendKeyButton.setEnabled(true);
                 unlockButton.setEnabled(true);
+                findViewById(R.id.space_button).setEnabled(true);
+                findViewById(R.id.password_button).setEnabled(true);
                 changePasswordButton.setEnabled(true);
             } else {
                 connectionStatusTextView.setText(R.string.not_connected);
                 connectToggleButton.setText(R.string.connect);
                 sendKeyButton.setEnabled(false);
                 unlockButton.setEnabled(false);
-                changePasswordButton.setEnabled(true); // Always allow password change
+                findViewById(R.id.space_button).setEnabled(false);
+                findViewById(R.id.password_button).setEnabled(false);
+                changePasswordButton.setEnabled(true);
             }
             connectToggleButton.setEnabled(true);
         });

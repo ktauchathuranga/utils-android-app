@@ -79,12 +79,42 @@
                 android:enabled="false" />
 
             <com.google.android.material.button.MaterialButton
+                android:id="@+id/space_button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:text="@string/space"
+                android:textSize="16sp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                app:strokeColor="@color/futuristic_lavender_secondary"
+                android:textColor="@color/button_text_color"
+                app:layout_constraintTop_toBottomOf="@id/unlock_button"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                android:layout_marginTop="16dp"
+                android:enabled="false" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/password_button"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:text="@string/password"
+                android:textSize="16sp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                app:strokeColor="@color/futuristic_lavender_secondary"
+                android:textColor="@color/button_text_color"
+                app:layout_constraintTop_toBottomOf="@id/space_button"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                android:layout_marginTop="16dp"
+                android:enabled="false" />
+
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/change_password_button"
                 android:layout_width="0dp"
                 android:layout_height="56dp"
                 android:text="@string/change_password"
                 android:textSize="16sp"
-                app:layout_constraintTop_toBottomOf="@id/unlock_button"
+                app:layout_constraintTop_toBottomOf="@id/password_button"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintBottom_toBottomOf="parent"

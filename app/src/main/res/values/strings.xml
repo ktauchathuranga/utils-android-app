@@ -15,6 +15,8 @@
     <string name="disconnect_failed_generic">Failed to disconnect unexpectedly</string>
     <string name="win_l_sent">Lock (Win+L)</string>
     <string name="unlock">Unlock</string>
+    <string name="space">Space</string>
+    <string name="password">Password</string>
     <string name="change_password">Change Password</string>
     <string name="send_command_failed_permission">Failed to send command due to permission issue</string>
     <string name="send_command_failed_generic">Failed to send command unexpectedly</string>
