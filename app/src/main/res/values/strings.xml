@@ -17,6 +17,8 @@
     <string name="unlock">Unlock</string>
     <string name="space">Space</string>
     <string name="password">Password</string>
+    <string name="clipboard_hint">Paste text to send</string>
+    <string name="send_clipboard">Send Text</string>
     <string name="change_password">Change Password</string>
     <string name="send_command_failed_permission">Failed to send command due to permission issue</string>
     <string name="send_command_failed_generic">Failed to send command unexpectedly</string>

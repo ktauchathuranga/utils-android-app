@@ -59,6 +59,8 @@ public class MainActivity extends AppCompatActivity {
     private Button spaceButton;
     private Button passwordButton;
     private Button changePasswordButton;
+    private EditText clipboardInput;
+    private Button sendClipboardButton;
     private ActivityResultLauncher<Intent> bluetoothEnableLauncher;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Executor backgroundExecutor = Executors.newSingleThreadExecutor();
@@ -131,6 +133,7 @@ public class MainActivity extends AppCompatActivity {
         changePasswordButton.setOnClickListener(v -> showChangePasswordDialog());
         spaceButton.setOnClickListener(v -> sendSpaceCommand());
         passwordButton.setOnClickListener(v -> sendPasswordCommand());
+        sendClipboardButton.setOnClickListener(v -> sendClipboardText());
     }
 
     private void initializeEncryptedPrefs() {
@@ -161,6 +164,8 @@ public class MainActivity extends AppCompatActivity {
         changePasswordButton = findViewById(R.id.change_password_button);
         spaceButton = findViewById(R.id.space_button);
         passwordButton = findViewById(R.id.password_button);
+        clipboardInput = findViewById(R.id.clipboard_input);
+        sendClipboardButton = findViewById(R.id.send_clipboard_button);
         updateUiState(false);
     }
 
@@ -574,6 +579,47 @@ public class MainActivity extends AppCompatActivity {
         builder.show();
     }
 
+    private void sendClipboardText() {
+        if (!canPerformBluetoothOperation() || !isConnected()) {
+            showToast(R.string.not_connected);
+            return;
+        }
+        String text = clipboardInput.getText().toString().trim();
+        if (text.isEmpty()) {
+            showToast("Please enter text to send");
+            return;
+        }
+        backgroundExecutor.execute(() -> {
+            try {
+                for (char c : text.toCharArray()) {
+                    try {
+                        byte[] report = getHidReport(c);
+                        hidDevice.sendReport(connectedDevice, 0, report);
+                        Thread.sleep(5);
+                        hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                        Thread.sleep(5);
+                    } catch (IllegalArgumentException e) {
+                        Log.w(TAG, "Unsupported character skipped: " + c);
+                        continue; // Skip unsupported characters
+                    }
+                }
+                Log.d(TAG, "Clipboard text sent successfully");
+                showToast("Text sent");
+                runOnUiThread(() -> clipboardInput.setText("")); // Clear input after sending
+            } catch (SecurityException e) {
+                Log.e(TAG, "Failed to send clipboard text: " + e.getMessage(), e);
+                showToast(R.string.send_command_failed_permission);
+            } catch (InterruptedException e) {
+                Log.w(TAG, "Interrupted while sending clipboard text", e);
+                Thread.currentThread().interrupt();
+                showToast(R.string.send_command_failed_generic);
+            } catch (Exception e) {
+                Log.e(TAG, "Unexpected error sending clipboard text: " + e.getMessage(), e);
+                showToast(R.string.send_command_failed_generic);
+            }
+        });
+    }
+
     private void registerHidDevice() {
         if (!canPerformBluetoothOperation()) return;
         backgroundExecutor.execute(() -> {
@@ -632,6 +678,8 @@ public class MainActivity extends AppCompatActivity {
                 unlockButton.setEnabled(true);
                 findViewById(R.id.space_button).setEnabled(true);
                 findViewById(R.id.password_button).setEnabled(true);
+                clipboardInput.setEnabled(true);
+                sendClipboardButton.setEnabled(true);
                 changePasswordButton.setEnabled(true);
             } else {
                 connectionStatusTextView.setText(R.string.not_connected);
@@ -640,6 +688,8 @@ public class MainActivity extends AppCompatActivity {
                 unlockButton.setEnabled(false);
                 findViewById(R.id.space_button).setEnabled(false);
                 findViewById(R.id.password_button).setEnabled(false);
+                clipboardInput.setEnabled(false);
+                sendClipboardButton.setEnabled(false);
                 changePasswordButton.setEnabled(true);
             }
             connectToggleButton.setEnabled(true);
