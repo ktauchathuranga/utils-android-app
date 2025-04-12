@@ -117,3 +117,6 @@ A Bluetooth HID (Human Interface Device) keyboard emulator for Android, designed
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgement
+<a href="https://www.flaticon.com/free-icons/remote-support" title="remote support icons">Remote support icons created by Freepik - Flaticon</a>
