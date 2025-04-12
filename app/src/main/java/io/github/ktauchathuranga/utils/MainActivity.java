@@ -58,6 +58,7 @@ public class MainActivity extends AppCompatActivity {
     private Button unlockButton;
     private Button spaceButton;
     private Button passwordButton;
+    private Button sendClipboardWithEnterButton;
     private Button changePasswordButton;
     private EditText clipboardInput;
     private Button sendClipboardButton;
@@ -134,6 +135,7 @@ public class MainActivity extends AppCompatActivity {
         spaceButton.setOnClickListener(v -> sendSpaceCommand());
         passwordButton.setOnClickListener(v -> sendPasswordCommand());
         sendClipboardButton.setOnClickListener(v -> sendClipboardText());
+        sendClipboardWithEnterButton.setOnClickListener(v -> sendClipboardTextWithEnter());
     }
 
     private void initializeEncryptedPrefs() {
@@ -166,6 +168,7 @@ public class MainActivity extends AppCompatActivity {
         passwordButton = findViewById(R.id.password_button);
         clipboardInput = findViewById(R.id.clipboard_input);
         sendClipboardButton = findViewById(R.id.send_clipboard_button);
+        sendClipboardWithEnterButton = findViewById(R.id.send_clipboard_with_enter_button);
         updateUiState(false);
     }
 
@@ -584,6 +587,58 @@ public class MainActivity extends AppCompatActivity {
         builder.show();
     }
 
+    private void sendClipboardTextWithEnter() {
+        if (!canPerformBluetoothOperation() || !isConnected()) {
+            showToast(R.string.not_connected);
+            return;
+        }
+        String text = clipboardInput.getText().toString().trim();
+        backgroundExecutor.execute(() -> {
+            try {
+                if (text.isEmpty()) {
+                    // Send only Enter key if text is empty
+                    byte[] enterReport = getHidReport('\n');
+                    hidDevice.sendReport(connectedDevice, 0, enterReport);
+                    Thread.sleep(5);
+                    hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                    Log.d(TAG, "Enter key sent (empty input)");
+                    showToast("Enter key sent");
+                } else {
+                    // Send the text
+                    for (char c : text.toCharArray()) {
+                        try {
+                            byte[] report = getHidReport(c);
+                            hidDevice.sendReport(connectedDevice, 0, report);
+                            Thread.sleep(5);
+                            hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                            Thread.sleep(5);
+                        } catch (IllegalArgumentException e) {
+                            Log.w(TAG, "Unsupported character skipped: " + c);
+                            continue; // Skip unsupported characters
+                        }
+                    }
+                    // Send Enter key
+                    byte[] enterReport = getHidReport('\n');
+                    hidDevice.sendReport(connectedDevice, 0, enterReport);
+                    Thread.sleep(5);
+                    hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                    Log.d(TAG, "Clipboard text with Enter sent successfully");
+                    showToast("Text with Enter sent");
+                    runOnUiThread(() -> clipboardInput.setText("")); // Clear input after sending
+                }
+            } catch (SecurityException e) {
+                Log.e(TAG, "Failed to send clipboard text with Enter: " + e.getMessage(), e);
+                showToast(R.string.send_command_failed_permission);
+            } catch (InterruptedException e) {
+                Log.w(TAG, "Interrupted while sending clipboard text with Enter", e);
+                Thread.currentThread().interrupt();
+                showToast(R.string.send_command_failed_generic);
+            } catch (Exception e) {
+                Log.e(TAG, "Unexpected error sending clipboard text with Enter: " + e.getMessage(), e);
+                showToast(R.string.send_command_failed_generic);
+            }
+        });
+    }
     private void sendClipboardText() {
         if (!canPerformBluetoothOperation() || !isConnected()) {
             showToast(R.string.not_connected);
@@ -685,6 +740,7 @@ public class MainActivity extends AppCompatActivity {
                 findViewById(R.id.password_button).setEnabled(true);
                 clipboardInput.setEnabled(true);
                 sendClipboardButton.setEnabled(true);
+                sendClipboardWithEnterButton.setEnabled(true); // Enable new button
                 changePasswordButton.setEnabled(true);
             } else {
                 connectionStatusTextView.setText(R.string.not_connected);
@@ -695,6 +751,7 @@ public class MainActivity extends AppCompatActivity {
                 findViewById(R.id.password_button).setEnabled(false);
                 clipboardInput.setEnabled(false);
                 sendClipboardButton.setEnabled(false);
+                sendClipboardWithEnterButton.setEnabled(false); // Disable new button
                 changePasswordButton.setEnabled(true);
             }
             connectToggleButton.setEnabled(true);

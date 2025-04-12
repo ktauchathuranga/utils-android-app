@@ -33,128 +33,149 @@
                 android:text="@string/not_connected"
                 android:textSize="20sp"
                 android:textStyle="bold"
-                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent" />
+                app:layout_constraintTop_toTopOf="parent" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/connect_button"
                 android:layout_width="0dp"
                 android:layout_height="56dp"
+                android:layout_marginTop="24dp"
                 android:text="@string/connect"
                 android:textSize="16sp"
-                app:layout_constraintTop_toBottomOf="@id/status_text"
-                app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
-                android:layout_marginTop="24dp" />
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/status_text" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/send_button"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
                 android:layout_height="56dp"
-                android:text="@string/win_l_sent"
-                android:textSize="16sp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                app:strokeColor="@color/futuristic_lavender_secondary"
-                android:textColor="@color/button_text_color"
-                app:layout_constraintTop_toBottomOf="@id/connect_button"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
                 android:layout_marginTop="16dp"
-                android:enabled="false" />
+                android:enabled="false"
+                android:text="@string/win_l_sent"
+                android:textColor="@color/button_text_color"
+                android:textSize="16sp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/connect_button"
+                app:strokeColor="@color/futuristic_lavender_secondary" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/unlock_button"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
                 android:layout_height="56dp"
-                android:text="@string/unlock"
-                android:textSize="16sp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                app:strokeColor="@color/futuristic_lavender_secondary"
-                android:textColor="@color/button_text_color"
-                app:layout_constraintTop_toBottomOf="@id/send_button"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
                 android:layout_marginTop="16dp"
-                android:enabled="false" />
+                android:enabled="false"
+                android:text="@string/unlock"
+                android:textColor="@color/button_text_color"
+                android:textSize="16sp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/send_button"
+                app:strokeColor="@color/futuristic_lavender_secondary" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/space_button"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
                 android:layout_height="56dp"
-                android:text="@string/space"
-                android:textSize="16sp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                app:strokeColor="@color/futuristic_lavender_secondary"
-                android:textColor="@color/button_text_color"
-                app:layout_constraintTop_toBottomOf="@id/unlock_button"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
                 android:layout_marginTop="16dp"
-                android:enabled="false" />
+                android:enabled="false"
+                android:text="@string/space"
+                android:textColor="@color/button_text_color"
+                android:textSize="16sp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/unlock_button"
+                app:strokeColor="@color/futuristic_lavender_secondary" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/password_button"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
                 android:layout_height="56dp"
-                android:text="@string/password"
-                android:textSize="16sp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                app:strokeColor="@color/futuristic_lavender_secondary"
-                android:textColor="@color/button_text_color"
-                app:layout_constraintTop_toBottomOf="@id/space_button"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
                 android:layout_marginTop="16dp"
-                android:enabled="false" />
+                android:enabled="false"
+                android:text="@string/password"
+                android:textColor="@color/button_text_color"
+                android:textSize="16sp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/space_button"
+                app:strokeColor="@color/futuristic_lavender_secondary" />
 
             <!-- New Elements for Clipboard Sync -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/clipboard_input_layout"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                app:layout_constraintTop_toBottomOf="@id/password_button"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
                 android:layout_marginTop="16dp"
+                android:hint="@string/clipboard_hint"
                 app:hintEnabled="true"
-                android:hint="@string/clipboard_hint">
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/password_button">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/clipboard_input"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="text"
-                    android:enabled="false" />
+                    android:enabled="false"
+                    android:inputType="text" />
             </com.google.android.material.textfield.TextInputLayout>
 
+            <!-- Replace the existing send_clipboard_button with these two buttons -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/send_clipboard_button"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
                 android:layout_height="56dp"
-                android:text="@string/send_clipboard"
-                android:textSize="16sp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                app:strokeColor="@color/futuristic_lavender_secondary"
-                android:textColor="@color/button_text_color"
-                app:layout_constraintTop_toBottomOf="@id/clipboard_input_layout"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
                 android:layout_marginTop="16dp"
-                android:enabled="false" />
+                android:layout_marginEnd="8dp"
+                android:enabled="false"
+                android:text="@string/send_clipboard"
+                android:textColor="@color/button_text_color"
+                android:textSize="16sp"
+                app:layout_constraintEnd_toStartOf="@id/send_clipboard_with_enter_button"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/clipboard_input_layout"
+                app:layout_constraintWidth_percent="0.48"
+                app:strokeColor="@color/futuristic_lavender_secondary" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/send_clipboard_with_enter_button"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_marginStart="5dp"
+                android:layout_marginTop="16dp"
+                android:enabled="false"
+                android:text="@string/send_clipboard_with_enter"
+                android:textColor="@color/button_text_color"
+                android:textSize="16sp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toEndOf="@id/send_clipboard_button"
+                app:layout_constraintTop_toBottomOf="@id/clipboard_input_layout"
+                app:layout_constraintWidth_percent="0.48"
+                app:strokeColor="@color/futuristic_lavender_secondary" />
+
+            <!-- Adjust the change_password_button to align below the new buttons -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/change_password_button"
                 android:layout_width="0dp"
                 android:layout_height="56dp"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="16dp"
                 android:text="@string/change_password"
                 android:textSize="16sp"
-                app:layout_constraintTop_toBottomOf="@id/send_clipboard_button"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintBottom_toBottomOf="parent"
-                android:layout_marginTop="16dp"
-                android:layout_marginBottom="16dp" />
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/send_clipboard_button" />
 
         </androidx.constraintlayout.widget.ConstraintLayout>
     </com.google.android.material.card.MaterialCardView>
