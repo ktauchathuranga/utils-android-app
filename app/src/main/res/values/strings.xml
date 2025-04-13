@@ -17,6 +17,12 @@
     <string name="unlock">Unlock</string>
     <string name="space">Space</string>
     <string name="password">Password</string>
+    <string name="power_options">Power Options</string>
+    <string name="shutdown">Shutdown</string>
+    <string name="restart">Restart</string>
+    <string name="sleep">Sleep</string>
+    <string name="hibernate">Hibernate</string>
+    <string name="power_command_sent">Power command sent: %1$s</string>
     <string name="clipboard_hint">Paste text to send</string>
     <string name="send_clipboard">Send Text</string>
     <string name="send_clipboard_with_enter">Text + Enter</string>

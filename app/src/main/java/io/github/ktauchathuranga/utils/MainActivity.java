@@ -6,7 +6,6 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothHidDevice;
 import android.bluetooth.BluetoothHidDeviceAppSdpSettings;
 import android.bluetooth.BluetoothProfile;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
@@ -48,6 +47,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int MAX_CONNECT_RETRIES = 3;
     private static final String PREFS_NAME = "UtilsPrefs";
     private static final String KEY_PASSWORD = "unlock_password";
+    private static final String KEY_SPEED_PROFILE = "last_speed_profile";
 
     private BluetoothAdapter bluetoothAdapter;
     private BluetoothHidDevice hidDevice;
@@ -62,11 +62,16 @@ public class MainActivity extends AppCompatActivity {
     private Button changePasswordButton;
     private EditText clipboardInput;
     private Button sendClipboardButton;
+    private Button shutdownButton;
+    private Button restartButton;
+    private Button sleepButton;
+    private Button hibernateButton;
     private ActivityResultLauncher<Intent> bluetoothEnableLauncher;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Executor backgroundExecutor = Executors.newSingleThreadExecutor();
     private volatile boolean isHidServiceReady = false;
     private EncryptedSharedPreferences encryptedPrefs;
+    private SpeedProfile selectedSpeedProfile = null; // Store speed for current connection
 
     // HID descriptor for a standard USB keyboard
     private static final byte[] HID_DESCRIPTOR = {
@@ -108,6 +113,7 @@ public class MainActivity extends AppCompatActivity {
     private static final byte[] REPORT_WIN_L_PRESS = {0x08, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00}; // Left GUI + L
     private static final byte[] REPORT_SPACE_PRESS = {0x00, 0x00, 0x2C, 0x00, 0x00, 0x00, 0x00, 0x00}; // Space
     private static final byte[] REPORT_RELEASE = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};     // Key release
+    private static final byte[] REPORT_WIN_R_PRESS = {0x08, 0x00, 0x15, 0x00, 0x00, 0x00, 0x00, 0x00}; // Left GUI + R
 
     // HID key codes
     private static final byte[] DIGIT_KEY_CODES = {(byte) 0x27, (byte) 0x1E, (byte) 0x1F, (byte) 0x20, (byte) 0x21, (byte) 0x22, (byte) 0x23, (byte) 0x24, (byte) 0x25, (byte) 0x26};
@@ -130,12 +136,23 @@ public class MainActivity extends AppCompatActivity {
 
         connectToggleButton.setOnClickListener(v -> toggleConnection());
         sendKeyButton.setOnClickListener(v -> sendWinLCommand());
-        unlockButton.setOnClickListener(v -> sendUnlockCommand());
+        unlockButton.setOnClickListener(v -> handleMultiKeyCommand(() -> {
+            String storedPassword = encryptedPrefs.getString(KEY_PASSWORD, null);
+            if (storedPassword == null) {
+                showPasswordInputDialog();
+            } else {
+                sendUnlockWithPassword(storedPassword, selectedSpeedProfile);
+            }
+        }));
         changePasswordButton.setOnClickListener(v -> showChangePasswordDialog());
         spaceButton.setOnClickListener(v -> sendSpaceCommand());
-        passwordButton.setOnClickListener(v -> sendPasswordCommand());
-        sendClipboardButton.setOnClickListener(v -> sendClipboardText());
-        sendClipboardWithEnterButton.setOnClickListener(v -> sendClipboardTextWithEnter());
+        passwordButton.setOnClickListener(v -> handleMultiKeyCommand(() -> sendPasswordCommand(selectedSpeedProfile)));
+        sendClipboardButton.setOnClickListener(v -> handleMultiKeyCommand(() -> sendClipboardText(selectedSpeedProfile)));
+        sendClipboardWithEnterButton.setOnClickListener(v -> handleMultiKeyCommand(() -> sendClipboardTextWithEnter(selectedSpeedProfile)));
+        shutdownButton.setOnClickListener(v -> handleMultiKeyCommand(() -> sendPowerCommand("shutdown /s /f /t 0", "Shutdown", selectedSpeedProfile)));
+        restartButton.setOnClickListener(v -> handleMultiKeyCommand(() -> sendPowerCommand("shutdown /r /f /t 0", "Restart", selectedSpeedProfile)));
+        sleepButton.setOnClickListener(v -> handleMultiKeyCommand(() -> sendPowerCommand("rundll32.exe powrprof.dll,SetSuspendState 0,1,0", "Sleep", selectedSpeedProfile)));
+        hibernateButton.setOnClickListener(v -> handleMultiKeyCommand(() -> sendPowerCommand("shutdown /h", "Hibernate", selectedSpeedProfile)));
     }
 
     private void initializeEncryptedPrefs() {
@@ -150,6 +167,10 @@ public class MainActivity extends AppCompatActivity {
                     EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             );
+            // Set default speed profile if not already set
+            if (!encryptedPrefs.contains(KEY_SPEED_PROFILE)) {
+                encryptedPrefs.edit().putString(KEY_SPEED_PROFILE, SpeedProfile.MEDIUM.name()).apply();
+            }
             Log.d(TAG, "EncryptedSharedPreferences initialized successfully");
         } catch (GeneralSecurityException | IOException e) {
             Log.e(TAG, "Failed to initialize EncryptedSharedPreferences: " + e.getMessage(), e);
@@ -169,6 +190,10 @@ public class MainActivity extends AppCompatActivity {
         clipboardInput = findViewById(R.id.clipboard_input);
         sendClipboardButton = findViewById(R.id.send_clipboard_button);
         sendClipboardWithEnterButton = findViewById(R.id.send_clipboard_with_enter_button);
+        shutdownButton = findViewById(R.id.shutdown_button);
+        restartButton = findViewById(R.id.restart_button);
+        sleepButton = findViewById(R.id.sleep_button);
+        hibernateButton = findViewById(R.id.hibernate_button);
         updateUiState(false);
     }
 
@@ -389,37 +414,24 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void sendUnlockCommand() {
-        if (!canPerformBluetoothOperation() || !isConnected()) {
-            showToast(R.string.not_connected);
-            return;
-        }
-        String storedPassword = encryptedPrefs.getString(KEY_PASSWORD, null);
-        if (storedPassword == null) {
-            showPasswordInputDialog();
-            return;
-        }
-        sendUnlockWithPassword(storedPassword);
-    }
-
-    private void sendUnlockWithPassword(String password) {
+    private void sendUnlockWithPassword(String password, SpeedProfile speedProfile) {
         backgroundExecutor.execute(() -> {
             try {
                 // Send Space
                 hidDevice.sendReport(connectedDevice, 0, REPORT_SPACE_PRESS);
-                Thread.sleep(50);
+                Thread.sleep(speedProfile.getDelayMs());
                 hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
-                Thread.sleep(400);
+                Thread.sleep(400); // Keep initial delay before password
 
                 // Send password
                 for (char c : password.toCharArray()) {
                     byte[] report = getHidReport(c);
                     hidDevice.sendReport(connectedDevice, 0, report);
-                    Thread.sleep(20);
+                    Thread.sleep(speedProfile.getDelayMs());
                     hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
-                    Thread.sleep(20);
+                    Thread.sleep(speedProfile.getDelayMs());
                 }
-                Log.d(TAG, "Unlock command sent: Space + [password]");
+                Log.d(TAG, "Unlock command sent: Space + [password] at " + speedProfile);
                 showToast("Unlocked with stored password");
             } catch (SecurityException e) {
                 Log.e(TAG, "Failed to send unlock command: " + e.getMessage(), e);
@@ -461,7 +473,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void sendPasswordCommand() {
+    private void sendPasswordCommand(SpeedProfile speedProfile) {
         if (!canPerformBluetoothOperation() || !isConnected()) {
             showToast(R.string.not_connected);
             return;
@@ -477,11 +489,11 @@ public class MainActivity extends AppCompatActivity {
                 for (char c : storedPassword.toCharArray()) {
                     byte[] report = getHidReport(c);
                     hidDevice.sendReport(connectedDevice, 0, report);
-                    Thread.sleep(5);
+                    Thread.sleep(speedProfile.getDelayMs());
                     hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
-                    Thread.sleep(5);
+                    Thread.sleep(speedProfile.getDelayMs());
                 }
-                Log.d(TAG, "Password command sent successfully");
+                Log.d(TAG, "Password command sent successfully at " + speedProfile);
                 showToast("Password sent");
             } catch (SecurityException e) {
                 Log.e(TAG, "Failed to send password: " + e.getMessage(), e);
@@ -492,6 +504,173 @@ public class MainActivity extends AppCompatActivity {
                 showToast(R.string.send_command_failed_generic);
             } catch (Exception e) {
                 Log.e(TAG, "Unexpected error sending password: " + e.getMessage(), e);
+                showToast(R.string.send_command_failed_generic);
+            }
+        });
+    }
+
+    private void sendClipboardText(SpeedProfile speedProfile) {
+        if (!canPerformBluetoothOperation() || !isConnected()) {
+            showToast(R.string.not_connected);
+            return;
+        }
+        String text = clipboardInput.getText().toString().trim();
+        if (text.isEmpty()) {
+            showToast("Please enter text to send");
+            return;
+        }
+        backgroundExecutor.execute(() -> {
+            try {
+                for (char c : text.toCharArray()) {
+                    try {
+                        byte[] report = getHidReport(c);
+                        hidDevice.sendReport(connectedDevice, 0, report);
+                        Thread.sleep(speedProfile.getDelayMs());
+                        hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                        Thread.sleep(speedProfile.getDelayMs());
+                    } catch (IllegalArgumentException e) {
+                        Log.w(TAG, "Unsupported character skipped: " + c);
+                        continue; // Skip unsupported characters
+                    }
+                }
+                Log.d(TAG, "Clipboard text sent successfully at " + speedProfile);
+                showToast("Text sent");
+                runOnUiThread(() -> clipboardInput.setText("")); // Clear input after sending
+            } catch (SecurityException e) {
+                Log.e(TAG, "Failed to send clipboard text: " + e.getMessage(), e);
+                showToast(R.string.send_command_failed_permission);
+            } catch (InterruptedException e) {
+                Log.w(TAG, "Interrupted while sending clipboard text", e);
+                Thread.currentThread().interrupt();
+                showToast(R.string.send_command_failed_generic);
+            } catch (Exception e) {
+                Log.e(TAG, "Unexpected error sending clipboard text: " + e.getMessage(), e);
+                showToast(R.string.send_command_failed_generic);
+            }
+        });
+    }
+
+    private void sendClipboardTextWithEnter(SpeedProfile speedProfile) {
+        if (!canPerformBluetoothOperation() || !isConnected()) {
+            showToast(R.string.not_connected);
+            return;
+        }
+        String text = clipboardInput.getText().toString().trim();
+        backgroundExecutor.execute(() -> {
+            try {
+                if (text.isEmpty()) {
+                    // Send only Enter key if text is empty
+                    byte[] enterReport = getHidReport('\n');
+                    hidDevice.sendReport(connectedDevice, 0, enterReport);
+                    Thread.sleep(speedProfile.getDelayMs());
+                    hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                    Log.d(TAG, "Enter key sent (empty input) at " + speedProfile);
+                    showToast("Enter key sent");
+                } else {
+                    // Send the text
+                    for (char c : text.toCharArray()) {
+                        try {
+                            byte[] report = getHidReport(c);
+                            hidDevice.sendReport(connectedDevice, 0, report);
+                            Thread.sleep(speedProfile.getDelayMs());
+                            hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                            Thread.sleep(speedProfile.getDelayMs());
+                        } catch (IllegalArgumentException e) {
+                            Log.w(TAG, "Unsupported character skipped: " + c);
+                            continue; // Skip unsupported characters
+                        }
+                    }
+                    // Send Enter key
+                    byte[] enterReport = getHidReport('\n');
+                    hidDevice.sendReport(connectedDevice, 0, enterReport);
+                    Thread.sleep(speedProfile.getDelayMs());
+                    hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                    Log.d(TAG, "Clipboard text with Enter sent successfully at " + speedProfile);
+                    showToast("Text with Enter sent");
+                    runOnUiThread(() -> clipboardInput.setText("")); // Clear input after sending
+                }
+            } catch (SecurityException e) {
+                Log.e(TAG, "Failed to send clipboard text with Enter: " + e.getMessage(), e);
+                showToast(R.string.send_command_failed_permission);
+            } catch (InterruptedException e) {
+                Log.w(TAG, "Interrupted while sending clipboard text with Enter", e);
+                Thread.currentThread().interrupt();
+                showToast(R.string.send_command_failed_generic);
+            } catch (Exception e) {
+                Log.e(TAG, "Unexpected error sending clipboard text with Enter: " + e.getMessage(), e);
+                showToast(R.string.send_command_failed_generic);
+            }
+        });
+    }
+
+    private void sendPowerCommand(String command, String commandName, SpeedProfile speedProfile) {
+        if (!canPerformBluetoothOperation() || !isConnected()) {
+            showToast(R.string.not_connected);
+            return;
+        }
+        backgroundExecutor.execute(() -> {
+            try {
+                // Step 1: Open Run dialog (Win+R)
+                hidDevice.sendReport(connectedDevice, 0, REPORT_WIN_R_PRESS);
+                Thread.sleep(speedProfile.getDelayMs());
+                hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                Thread.sleep(400); // Wait for Run dialog to open
+
+                // Step 2: Type "cmd" and press Enter
+                for (char c : "cmd".toCharArray()) {
+                    byte[] report = getHidReport(c);
+                    hidDevice.sendReport(connectedDevice, 0, report);
+                    Thread.sleep(speedProfile.getDelayMs());
+                    hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                    Thread.sleep(speedProfile.getDelayMs());
+                }
+                byte[] enterReport = getHidReport('\n');
+                hidDevice.sendReport(connectedDevice, 0, enterReport);
+                Thread.sleep(speedProfile.getDelayMs());
+                hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                Thread.sleep(500); // Wait for Command Prompt to open
+
+                // Step 3: Type the power command and press Enter
+                for (char c : command.toCharArray()) {
+                    try {
+                        byte[] report = getHidReport(c);
+                        hidDevice.sendReport(connectedDevice, 0, report);
+                        Thread.sleep(speedProfile.getDelayMs());
+                        hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                        Thread.sleep(speedProfile.getDelayMs());
+                    } catch (IllegalArgumentException e) {
+                        Log.w(TAG, "Unsupported character in power command: " + c);
+                        continue;
+                    }
+                }
+                hidDevice.sendReport(connectedDevice, 0, enterReport);
+                Thread.sleep(speedProfile.getDelayMs());
+                hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                Thread.sleep(speedProfile.getDelayMs());
+
+                // Step 4: Exit Command Prompt by typing "exit" and pressing Enter
+                for (char c : "exit".toCharArray()) {
+                    byte[] report = getHidReport(c);
+                    hidDevice.sendReport(connectedDevice, 0, report);
+                    Thread.sleep(speedProfile.getDelayMs());
+                    hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                    Thread.sleep(speedProfile.getDelayMs());
+                }
+                hidDevice.sendReport(connectedDevice, 0, enterReport);
+                Thread.sleep(speedProfile.getDelayMs());
+                hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+
+                Log.d(TAG, commandName + " command sent successfully at " + speedProfile);
+                showToast(getString(R.string.power_command_sent, commandName));
+            } catch (SecurityException e) {
+                Log.e(TAG, "Failed to send " + commandName + " command: " + e.getMessage(), e);
+                showToast(R.string.send_command_failed_permission);
+            } catch (InterruptedException e) {
+                Log.w(TAG, "Interrupted while sending " + commandName + " command", e);
+                Thread.currentThread().interrupt();
+                showToast(R.string.send_command_failed_generic);
+            } catch (Exception e) {
+                Log.e(TAG, "Unexpected error sending " + commandName + " command: " + e.getMessage(), e);
                 showToast(R.string.send_command_failed_generic);
             }
         });
@@ -528,6 +707,7 @@ public class MainActivity extends AppCompatActivity {
         }
         return new byte[]{modifier, 0x00, keyCode, 0x00, 0x00, 0x00, 0x00, 0x00};
     }
+
     private void showPasswordInputDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Enter Unlock Password");
@@ -547,7 +727,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "Password saved securely");
                 showToast("Password saved");
                 if (isConnected()) {
-                    sendUnlockWithPassword(password); // Send immediately if connected
+                    handleMultiKeyCommand(() -> sendUnlockWithPassword(password, selectedSpeedProfile));
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Failed to save password: " + e.getMessage(), e);
@@ -587,97 +767,50 @@ public class MainActivity extends AppCompatActivity {
         builder.show();
     }
 
-    private void sendClipboardTextWithEnter() {
-        if (!canPerformBluetoothOperation() || !isConnected()) {
-            showToast(R.string.not_connected);
-            return;
-        }
-        String text = clipboardInput.getText().toString().trim();
-        backgroundExecutor.execute(() -> {
-            try {
-                if (text.isEmpty()) {
-                    // Send only Enter key if text is empty
-                    byte[] enterReport = getHidReport('\n');
-                    hidDevice.sendReport(connectedDevice, 0, enterReport);
-                    Thread.sleep(5);
-                    hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
-                    Log.d(TAG, "Enter key sent (empty input)");
-                    showToast("Enter key sent");
-                } else {
-                    // Send the text
-                    for (char c : text.toCharArray()) {
-                        try {
-                            byte[] report = getHidReport(c);
-                            hidDevice.sendReport(connectedDevice, 0, report);
-                            Thread.sleep(5);
-                            hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
-                            Thread.sleep(5);
-                        } catch (IllegalArgumentException e) {
-                            Log.w(TAG, "Unsupported character skipped: " + c);
-                            continue; // Skip unsupported characters
-                        }
-                    }
-                    // Send Enter key
-                    byte[] enterReport = getHidReport('\n');
-                    hidDevice.sendReport(connectedDevice, 0, enterReport);
-                    Thread.sleep(5);
-                    hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
-                    Log.d(TAG, "Clipboard text with Enter sent successfully");
-                    showToast("Text with Enter sent");
-                    runOnUiThread(() -> clipboardInput.setText("")); // Clear input after sending
-                }
-            } catch (SecurityException e) {
-                Log.e(TAG, "Failed to send clipboard text with Enter: " + e.getMessage(), e);
-                showToast(R.string.send_command_failed_permission);
-            } catch (InterruptedException e) {
-                Log.w(TAG, "Interrupted while sending clipboard text with Enter", e);
-                Thread.currentThread().interrupt();
-                showToast(R.string.send_command_failed_generic);
-            } catch (Exception e) {
-                Log.e(TAG, "Unexpected error sending clipboard text with Enter: " + e.getMessage(), e);
-                showToast(R.string.send_command_failed_generic);
-            }
-        });
-    }
-    private void sendClipboardText() {
-        if (!canPerformBluetoothOperation() || !isConnected()) {
-            showToast(R.string.not_connected);
-            return;
-        }
-        String text = clipboardInput.getText().toString().trim();
-        if (text.isEmpty()) {
-            showToast("Please enter text to send");
-            return;
-        }
-        backgroundExecutor.execute(() -> {
-            try {
-                for (char c : text.toCharArray()) {
+    private void showSpeedSelectionDialog(Runnable commandExecutor) {
+        final String[] speedOptions = {"Slow", "Medium", "Fast"};
+        SpeedProfile[] profiles = {SpeedProfile.SLOW, SpeedProfile.MEDIUM, SpeedProfile.FAST};
+        int defaultIndex = getLastSpeedProfile().ordinal();
+
+        new AlertDialog.Builder(this)
+                .setTitle("Select Sending Speed")
+                .setSingleChoiceItems(speedOptions, defaultIndex, (dialog, which) -> {
+                    selectedSpeedProfile = profiles[which];
                     try {
-                        byte[] report = getHidReport(c);
-                        hidDevice.sendReport(connectedDevice, 0, report);
-                        Thread.sleep(5);
-                        hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
-                        Thread.sleep(5);
-                    } catch (IllegalArgumentException e) {
-                        Log.w(TAG, "Unsupported character skipped: " + c);
-                        continue; // Skip unsupported characters
+                        encryptedPrefs.edit().putString(KEY_SPEED_PROFILE, selectedSpeedProfile.name()).apply();
+                        Log.d(TAG, "Selected speed profile: " + selectedSpeedProfile);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to save speed profile: " + e.getMessage(), e);
                     }
-                }
-                Log.d(TAG, "Clipboard text sent successfully");
-                showToast("Text sent");
-                runOnUiThread(() -> clipboardInput.setText("")); // Clear input after sending
-            } catch (SecurityException e) {
-                Log.e(TAG, "Failed to send clipboard text: " + e.getMessage(), e);
-                showToast(R.string.send_command_failed_permission);
-            } catch (InterruptedException e) {
-                Log.w(TAG, "Interrupted while sending clipboard text", e);
-                Thread.currentThread().interrupt();
-                showToast(R.string.send_command_failed_generic);
-            } catch (Exception e) {
-                Log.e(TAG, "Unexpected error sending clipboard text: " + e.getMessage(), e);
-                showToast(R.string.send_command_failed_generic);
-            }
-        });
+                    dialog.dismiss();
+                    // Execute the command with the selected speed
+                    commandExecutor.run();
+                })
+                .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                .setCancelable(true)
+                .show();
+    }
+
+    private SpeedProfile getLastSpeedProfile() {
+        String speedName = encryptedPrefs.getString(KEY_SPEED_PROFILE, SpeedProfile.MEDIUM.name());
+        try {
+            return SpeedProfile.valueOf(speedName);
+        } catch (IllegalArgumentException e) {
+            Log.w(TAG, "Invalid stored speed profile, defaulting to MEDIUM");
+            return SpeedProfile.MEDIUM;
+        }
+    }
+
+    private void handleMultiKeyCommand(Runnable commandExecutor) {
+        if (!canPerformBluetoothOperation() || !isConnected()) {
+            showToast(R.string.not_connected);
+            return;
+        }
+        if (selectedSpeedProfile == null) {
+            showSpeedSelectionDialog(commandExecutor);
+        } else {
+            commandExecutor.run();
+        }
     }
 
     private void registerHidDevice() {
@@ -736,23 +869,32 @@ public class MainActivity extends AppCompatActivity {
                 connectToggleButton.setText(R.string.disconnect);
                 sendKeyButton.setEnabled(true);
                 unlockButton.setEnabled(true);
-                findViewById(R.id.space_button).setEnabled(true);
-                findViewById(R.id.password_button).setEnabled(true);
+                spaceButton.setEnabled(true);
+                passwordButton.setEnabled(true);
                 clipboardInput.setEnabled(true);
                 sendClipboardButton.setEnabled(true);
-                sendClipboardWithEnterButton.setEnabled(true); // Enable new button
+                sendClipboardWithEnterButton.setEnabled(true);
                 changePasswordButton.setEnabled(true);
+                shutdownButton.setEnabled(true);
+                restartButton.setEnabled(true);
+                // TODO: conflict between sleep and hibernate
+                sleepButton.setEnabled(false); // Disabled still working on these 2
+                hibernateButton.setEnabled(false);
             } else {
                 connectionStatusTextView.setText(R.string.not_connected);
                 connectToggleButton.setText(R.string.connect);
                 sendKeyButton.setEnabled(false);
                 unlockButton.setEnabled(false);
-                findViewById(R.id.space_button).setEnabled(false);
-                findViewById(R.id.password_button).setEnabled(false);
+                spaceButton.setEnabled(false);
+                passwordButton.setEnabled(false);
                 clipboardInput.setEnabled(false);
                 sendClipboardButton.setEnabled(false);
-                sendClipboardWithEnterButton.setEnabled(false); // Disable new button
+                sendClipboardWithEnterButton.setEnabled(false);
                 changePasswordButton.setEnabled(true);
+                shutdownButton.setEnabled(false);
+                restartButton.setEnabled(false);
+                sleepButton.setEnabled(false);
+                hibernateButton.setEnabled(false);
             }
             connectToggleButton.setEnabled(true);
         });
@@ -778,6 +920,7 @@ public class MainActivity extends AppCompatActivity {
                     break;
                 case BluetoothProfile.STATE_DISCONNECTED:
                     connectedDevice = null;
+                    selectedSpeedProfile = null; // Reset speed profile on disconnect
                     updateUiState(false);
                     showToast(R.string.disconnected);
                     break;
