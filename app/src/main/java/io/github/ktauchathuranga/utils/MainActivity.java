@@ -61,6 +61,10 @@ public class MainActivity extends AppCompatActivity {
     private Button changePasswordButton;
     private EditText clipboardInput;
     private Button sendClipboardButton;
+    private Button shutdownButton;
+    private Button restartButton;
+    private Button sleepButton;
+    private Button hibernateButton;
     private ActivityResultLauncher<Intent> bluetoothEnableLauncher;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Executor backgroundExecutor = Executors.newSingleThreadExecutor();
@@ -107,6 +111,7 @@ public class MainActivity extends AppCompatActivity {
     private static final byte[] REPORT_WIN_L_PRESS = {0x08, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00}; // Left GUI + L
     private static final byte[] REPORT_SPACE_PRESS = {0x00, 0x00, 0x2C, 0x00, 0x00, 0x00, 0x00, 0x00}; // Space
     private static final byte[] REPORT_RELEASE = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};     // Key release
+    private static final byte[] REPORT_WIN_R_PRESS = {0x08, 0x00, 0x15, 0x00, 0x00, 0x00, 0x00, 0x00}; // Left GUI + R
 
     // HID key codes
     private static final byte[] DIGIT_KEY_CODES = {(byte) 0x27, (byte) 0x1E, (byte) 0x1F, (byte) 0x20, (byte) 0x21, (byte) 0x22, (byte) 0x23, (byte) 0x24, (byte) 0x25, (byte) 0x26};
@@ -135,6 +140,11 @@ public class MainActivity extends AppCompatActivity {
         passwordButton.setOnClickListener(v -> sendPasswordCommand());
         sendClipboardButton.setOnClickListener(v -> sendClipboardText());
         sendClipboardWithEnterButton.setOnClickListener(v -> sendClipboardTextWithEnter());
+        shutdownButton.setOnClickListener(v -> sendPowerCommand("shutdown /s /f /t 120", "Shutdown"));
+        restartButton.setOnClickListener(v -> sendPowerCommand("shutdown /r /f /t 120", "Restart"));
+        sleepButton.setOnClickListener(v -> sendPowerCommand("rundll32.exe powrprof.dll,SetSuspendState 0,1,0", "Sleep"));
+        hibernateButton.setOnClickListener(v -> sendPowerCommand("shutdown /h", "Hibernate"));
+
     }
 
     private void initializeEncryptedPrefs() {
@@ -168,6 +178,10 @@ public class MainActivity extends AppCompatActivity {
         clipboardInput = findViewById(R.id.clipboard_input);
         sendClipboardButton = findViewById(R.id.send_clipboard_button);
         sendClipboardWithEnterButton = findViewById(R.id.send_clipboard_with_enter_button);
+        shutdownButton = findViewById(R.id.shutdown_button);
+        restartButton = findViewById(R.id.restart_button);
+        sleepButton = findViewById(R.id.sleep_button);
+        hibernateButton = findViewById(R.id.hibernate_button);
         updateUiState(false);
     }
 
@@ -679,6 +693,79 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void sendPowerCommand(String command, String commandName) {
+        if (!canPerformBluetoothOperation() || !isConnected()) {
+            showToast(R.string.not_connected);
+            return;
+        }
+        backgroundExecutor.execute(() -> {
+            try {
+                // Step 1: Open Run dialog (Win+R)
+                hidDevice.sendReport(connectedDevice, 0, REPORT_WIN_R_PRESS);
+                Thread.sleep(20);
+                hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                Thread.sleep(400); // Wait for Run dialog to open
+
+                // Step 2: Type "cmd" and press Enter
+                for (char c : "cmd".toCharArray()) {
+                    byte[] report = getHidReport(c);
+                    hidDevice.sendReport(connectedDevice, 0, report);
+                    Thread.sleep(10);
+                    hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                    Thread.sleep(10);
+                }
+                byte[] enterReport = getHidReport('\n');
+                hidDevice.sendReport(connectedDevice, 0, enterReport);
+                Thread.sleep(10);
+                hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                Thread.sleep(400); // Wait for Command Prompt to open
+
+                // Step 3: Type the power command and press Enter
+                for (char c : command.toCharArray()) {
+                    try {
+                        byte[] report = getHidReport(c);
+                        hidDevice.sendReport(connectedDevice, 0, report);
+                        Thread.sleep(5);
+                        hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                        Thread.sleep(5);
+                    } catch (IllegalArgumentException e) {
+                        Log.w(TAG, "Unsupported character in power command: " + c);
+                        continue;
+                    }
+                }
+                hidDevice.sendReport(connectedDevice, 0, enterReport);
+                Thread.sleep(20);
+                hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                Thread.sleep(50);
+
+                // Step 4: Exit Command Prompt by typing "exit" and pressing Enter
+                for (char c : "exit".toCharArray()) {
+                    byte[] report = getHidReport(c);
+                    hidDevice.sendReport(connectedDevice, 0, report);
+                    Thread.sleep(20);
+                    hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+                    Thread.sleep(20);
+                }
+                hidDevice.sendReport(connectedDevice, 0, enterReport);
+                Thread.sleep(20);
+                hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
+
+                Log.d(TAG, commandName + " command sent successfully");
+                showToast(getString(R.string.power_command_sent, commandName));
+            } catch (SecurityException e) {
+                Log.e(TAG, "Failed to send " + commandName + " command: " + e.getMessage(), e);
+                showToast(R.string.send_command_failed_permission);
+            } catch (InterruptedException e) {
+                Log.w(TAG, "Interrupted while sending " + commandName + " command", e);
+                Thread.currentThread().interrupt();
+                showToast(R.string.send_command_failed_generic);
+            } catch (Exception e) {
+                Log.e(TAG, "Unexpected error sending " + commandName + " command: " + e.getMessage(), e);
+                showToast(R.string.send_command_failed_generic);
+            }
+        });
+    }
+
     private void registerHidDevice() {
         if (!canPerformBluetoothOperation()) return;
         backgroundExecutor.execute(() -> {
@@ -735,23 +822,31 @@ public class MainActivity extends AppCompatActivity {
                 connectToggleButton.setText(R.string.disconnect);
                 sendKeyButton.setEnabled(true);
                 unlockButton.setEnabled(true);
-                findViewById(R.id.space_button).setEnabled(true);
-                findViewById(R.id.password_button).setEnabled(true);
+                spaceButton.setEnabled(true);
+                passwordButton.setEnabled(true);
                 clipboardInput.setEnabled(true);
                 sendClipboardButton.setEnabled(true);
-                sendClipboardWithEnterButton.setEnabled(true); // Enable new button
+                sendClipboardWithEnterButton.setEnabled(true);
                 changePasswordButton.setEnabled(true);
+                shutdownButton.setEnabled(true);
+                restartButton.setEnabled(true);
+                sleepButton.setEnabled(false); // Disabled still working on these 2
+                hibernateButton.setEnabled(false);
             } else {
                 connectionStatusTextView.setText(R.string.not_connected);
                 connectToggleButton.setText(R.string.connect);
                 sendKeyButton.setEnabled(false);
                 unlockButton.setEnabled(false);
-                findViewById(R.id.space_button).setEnabled(false);
-                findViewById(R.id.password_button).setEnabled(false);
+                spaceButton.setEnabled(false);
+                passwordButton.setEnabled(false);
                 clipboardInput.setEnabled(false);
                 sendClipboardButton.setEnabled(false);
-                sendClipboardWithEnterButton.setEnabled(false); // Disable new button
+                sendClipboardWithEnterButton.setEnabled(false);
                 changePasswordButton.setEnabled(true);
+                shutdownButton.setEnabled(false);
+                restartButton.setEnabled(false);
+                sleepButton.setEnabled(false);
+                hibernateButton.setEnabled(false);
             }
             connectToggleButton.setEnabled(true);
         });
