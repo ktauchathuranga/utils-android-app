@@ -140,8 +140,8 @@ public class MainActivity extends AppCompatActivity {
         passwordButton.setOnClickListener(v -> sendPasswordCommand());
         sendClipboardButton.setOnClickListener(v -> sendClipboardText());
         sendClipboardWithEnterButton.setOnClickListener(v -> sendClipboardTextWithEnter());
-        shutdownButton.setOnClickListener(v -> sendPowerCommand("shutdown /s /f /t 120", "Shutdown"));
-        restartButton.setOnClickListener(v -> sendPowerCommand("shutdown /r /f /t 120", "Restart"));
+        shutdownButton.setOnClickListener(v -> sendPowerCommand("shutdown /s /f /t 0", "Shutdown"));
+        restartButton.setOnClickListener(v -> sendPowerCommand("shutdown /r /f /t 0", "Restart"));
         sleepButton.setOnClickListener(v -> sendPowerCommand("rundll32.exe powrprof.dll,SetSuspendState 0,1,0", "Sleep"));
         hibernateButton.setOnClickListener(v -> sendPowerCommand("shutdown /h", "Hibernate"));
 
@@ -718,7 +718,7 @@ public class MainActivity extends AppCompatActivity {
                 hidDevice.sendReport(connectedDevice, 0, enterReport);
                 Thread.sleep(10);
                 hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
-                Thread.sleep(400); // Wait for Command Prompt to open
+                Thread.sleep(500); // Wait for Command Prompt to open
 
                 // Step 3: Type the power command and press Enter
                 for (char c : command.toCharArray()) {
@@ -734,20 +734,20 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
                 hidDevice.sendReport(connectedDevice, 0, enterReport);
-                Thread.sleep(20);
+                Thread.sleep(5);
                 hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
-                Thread.sleep(50);
+                Thread.sleep(5);
 
                 // Step 4: Exit Command Prompt by typing "exit" and pressing Enter
                 for (char c : "exit".toCharArray()) {
                     byte[] report = getHidReport(c);
                     hidDevice.sendReport(connectedDevice, 0, report);
-                    Thread.sleep(20);
+                    Thread.sleep(5);
                     hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
-                    Thread.sleep(20);
+                    Thread.sleep(5);
                 }
                 hidDevice.sendReport(connectedDevice, 0, enterReport);
-                Thread.sleep(20);
+                Thread.sleep(5);
                 hidDevice.sendReport(connectedDevice, 0, REPORT_RELEASE);
 
                 Log.d(TAG, commandName + " command sent successfully");
