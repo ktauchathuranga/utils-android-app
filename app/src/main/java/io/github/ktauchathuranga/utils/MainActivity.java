@@ -877,6 +877,7 @@ public class MainActivity extends AppCompatActivity {
                 changePasswordButton.setEnabled(true);
                 shutdownButton.setEnabled(true);
                 restartButton.setEnabled(true);
+                // TODO: conflict between sleep and hibernate
                 sleepButton.setEnabled(false); // Disabled still working on these 2
                 hibernateButton.setEnabled(false);
             } else {
