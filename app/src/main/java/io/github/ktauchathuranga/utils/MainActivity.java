@@ -824,7 +824,7 @@ public class MainActivity extends AppCompatActivity {
                         hidDevice = (BluetoothHidDevice) proxy;
                         Log.d(TAG, "HID service connected");
                         BluetoothHidDeviceAppSdpSettings sdp = new BluetoothHidDeviceAppSdpSettings(
-                                "BluetoothHIDKeyboard", "Virtual Keyboard", "xAI", (byte) 0x40, HID_DESCRIPTOR
+                                "BluetoothHIDKeyboard", "Virtual Keyboard", "ktauchathuranga", (byte) 0x40, HID_DESCRIPTOR
                         );
                         try {
                             hidDevice.registerApp(sdp, null, null, new MainThreadExecutor(), new HidCallback());
