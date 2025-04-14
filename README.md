@@ -59,6 +59,33 @@ A Bluetooth HID (Human Interface Device) keyboard emulator for Android, designed
     - Scan for devices, find your PC, and pair it.
     - Ensure pairing is successful (you may need to accept a prompt on both devices).
 
+## Download Guide
+
+To download and install the Utils app on your Android device, follow these steps:
+
+1. **Go to the Releases Section**:
+    - Visit the [Releases page](https://github.com/ktauchathuranga/utils-android-app/releases) of the Utils Android App repository on GitHub.
+
+2. **Find the Latest Release**:
+    - Locate the latest release at the top of the Releases page.
+
+3. **Download the APK**:
+    - Expand the **Assets** section of the release.
+    - Find the APK file named `app-release-<version>.apk` (e.g., `app-release-v0.1.0.apk` for version 0.1.0).
+    - Click the APK file to download it to your device.
+
+4. **Install the APK**:
+    - On your Android device, locate the downloaded APK file (usually in the `Downloads` folder).
+    - Tap the APK file to start the installation process.
+    - If prompted, enable **Install from Unknown Sources** in your device settings to allow installation of apps from outside the Google Play Store. (You can disable this setting after installation for security.)
+    - Follow the on-screen prompts to complete the installation.
+
+5. **Launch the App**:
+    - Once installed, open the Utils app from your app drawer and grant the necessary Bluetooth permissions when prompted.
+
+**Note**: Ensure your Android device meets the requirements (Android 9.0 or higher) before installing. Always download APKs from trusted sources like this repository to avoid security risks.
+
+
 ## Usage
 1. **Launch the App**:
     - Grant Bluetooth permissions when prompted.
