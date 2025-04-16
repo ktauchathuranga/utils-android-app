@@ -1,8 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.github.ktauchathuranga.utils">
+
+    <!-- Permissions -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- Declare Bluetooth hardware requirement -->
+    <uses-feature
+        android:name="android.hardware.bluetooth"
+        android:required="true" />
 
     <application
         android:allowBackup="true"
@@ -10,6 +18,8 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.Utils">
+
+        <!-- Main Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -18,5 +28,38 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Widget Configuration Activity -->
+        <activity
+            android:name=".WidgetConfigActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <!-- Widget Provider -->
+        <receiver
+            android:name=".BluetoothHidWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="io.github.ktauchathuranga.utils.ACTION_CONNECT" />
+                <action android:name="io.github.ktauchathuranga.utils.ACTION_WIN_L" />
+                <action android:name="io.github.ktauchathuranga.utils.ACTION_UNLOCK" />
+                <action android:name="io.github.ktauchathuranga.utils.ACTION_SHUTDOWN" />
+                <action android:name="io.github.ktauchathuranga.utils.ACTION_UPDATE_STATUS" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info" />
+        </receiver>
+
+        <!-- Service -->
+        <service
+            android:name=".BluetoothHidService"
+            android:exported="false"
+            android:permission="android.permission.BLUETOOTH_CONNECT" />
     </application>
+
 </manifest>
