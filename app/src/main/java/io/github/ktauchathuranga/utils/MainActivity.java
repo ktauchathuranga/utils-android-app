@@ -74,7 +74,7 @@ public class MainActivity extends AppCompatActivity {
     private SpeedProfile selectedSpeedProfile = null; // Store speed for current connection
 
     // HID descriptor for a standard USB keyboard
-    private static final byte[] HID_DESCRIPTOR = {
+    public static final byte[] HID_DESCRIPTOR = {
             (byte) 0x05, (byte) 0x01, // USAGE_PAGE (Generic Desktop)
             (byte) 0x09, (byte) 0x06, // USAGE (Keyboard)
             (byte) 0xa1, (byte) 0x01, // COLLECTION (Application)
@@ -110,10 +110,10 @@ public class MainActivity extends AppCompatActivity {
     };
 
     // HID reports
-    private static final byte[] REPORT_WIN_L_PRESS = {0x08, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00}; // Left GUI + L
-    private static final byte[] REPORT_SPACE_PRESS = {0x00, 0x00, 0x2C, 0x00, 0x00, 0x00, 0x00, 0x00}; // Space
-    private static final byte[] REPORT_RELEASE = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};     // Key release
-    private static final byte[] REPORT_WIN_R_PRESS = {0x08, 0x00, 0x15, 0x00, 0x00, 0x00, 0x00, 0x00}; // Left GUI + R
+    public static final byte[] REPORT_WIN_L_PRESS = {0x08, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00}; // Left GUI + L
+    public static final byte[] REPORT_SPACE_PRESS = {0x00, 0x00, 0x2C, 0x00, 0x00, 0x00, 0x00, 0x00}; // Space
+    public static final byte[] REPORT_RELEASE = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};     // Key release
+    public static final byte[] REPORT_WIN_R_PRESS = {0x08, 0x00, 0x15, 0x00, 0x00, 0x00, 0x00, 0x00}; // Left GUI + R
 
     // HID key codes
     private static final byte[] DIGIT_KEY_CODES = {(byte) 0x27, (byte) 0x1E, (byte) 0x1F, (byte) 0x20, (byte) 0x21, (byte) 0x22, (byte) 0x23, (byte) 0x24, (byte) 0x25, (byte) 0x26};
@@ -676,7 +676,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private byte[] getHidReport(char c) {
+    public static byte[] getHidReport(char c) {
         byte modifier = 0x00;
         byte keyCode;
 
@@ -936,7 +936,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private static class MainThreadExecutor implements Executor {
+    static class MainThreadExecutor implements Executor {
         private final Handler handler = new Handler(Looper.getMainLooper());
 
         @Override

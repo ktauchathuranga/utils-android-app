@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="4dp"
+    android:background="#80FFFFFF">
+
+    <TextView
+        android:id="@+id/widget_status_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/widget_not_connected"
+        android:textSize="12sp"
+        android:gravity="center"
+        android:padding="2dp" />
+
+    <LinearLayout
+        style="?android:attr/buttonBarStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="2dp">
+
+        <Button
+            android:id="@+id/widget_connect_button"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/connect"
+            android:textSize="10sp"
+            android:layout_marginEnd="2dp" />
+
+        <Button
+            android:id="@+id/widget_win_l_button"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/win_l_sent"
+            android:textSize="10sp"
+            android:layout_marginStart="2dp"
+            android:enabled="false" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        style="?android:attr/buttonBarStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="2dp">
+
+        <Button
+            android:id="@+id/widget_unlock_button"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/unlock"
+            android:textSize="10sp"
+            android:layout_marginEnd="2dp"
+            android:enabled="false" />
+
+        <Button
+            android:id="@+id/widget_shutdown_button"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/shutdown"
+            android:textSize="10sp"
+            android:layout_marginStart="2dp"
+            android:enabled="false" />
+
+    </LinearLayout>
+
+</LinearLayout>
